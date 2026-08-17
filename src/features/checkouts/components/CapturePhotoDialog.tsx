@@ -6,6 +6,8 @@ import { Modal } from '../../../components/shared/Modal'
 interface CapturePhotoDialogProps {
   onClose: () => void
   onCapture: (photoDataUrl: string) => void | Promise<void>
+  onBack?: () => void
+  embedded?: boolean
   title?: string
   helperText?: string
   captureLabel?: string
@@ -15,6 +17,8 @@ interface CapturePhotoDialogProps {
 export const CapturePhotoDialog = ({
   onClose,
   onCapture,
+  onBack,
+  embedded = false,
   title = 'Capturar foto do instrutor',
   helperText = 'Pré-visualização ativa. Posicione o instrutor no quadro antes de capturar.',
   captureLabel = 'Capturar foto',
@@ -249,73 +253,88 @@ export const CapturePhotoDialog = ({
     }
   }
 
-  return (
-    <Modal title={title} onClose={onClose}>
-      <div className="space-y-5">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          capture="user"
-          onChange={(event) => void handleUploadFallback(event)}
-          className="hidden"
+  const content = (
+    <div className="space-y-5">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        onChange={(event) => void handleUploadFallback(event)}
+        className="hidden"
+      />
+
+      <div className="relative overflow-hidden rounded-[1.5rem] border border-brand-ink/10 bg-brand-ink">
+        <video
+          key={cameraSessionKey}
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="aspect-video max-h-[60vh] w-full bg-black object-cover"
         />
 
-        <div className="relative overflow-hidden rounded-[1.5rem] border border-brand-ink/10 bg-brand-ink">
-          <video
-            key={cameraSessionKey}
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="aspect-video max-h-[60vh] w-full bg-black object-cover"
-          />
-
-          {cameraState !== 'ready' ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/80 px-6 text-center text-sm text-white/80">
-              {cameraState === 'loading'
-                ? 'Conectando à câmera e aguardando a pré-visualização...'
-                : 'Falha ao carregar a câmera. Revise a permissão do navegador e tente novamente.'}
-            </div>
-          ) : null}
-        </div>
-
-        {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
-
-        {cameraState === 'ready' ? (
-          <div className="space-y-1 text-sm text-brand-ink/65">
-            <p>{helperText}</p>
-            {cameraDiagnostics ? <p>{cameraDiagnostics}</p> : null}
+        {cameraState !== 'ready' ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/80 px-6 text-center text-sm text-white/80">
+            {cameraState === 'loading'
+              ? 'Conectando à câmera e aguardando a pré-visualização...'
+              : 'Falha ao carregar a câmera. Revise a permissão do navegador e tente novamente.'}
           </div>
         ) : null}
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => void handleCapture()}
-            disabled={cameraState !== 'ready' || isProcessingCapture}
-            className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Camera className="h-4 w-4" />
-            {isProcessingCapture ? 'Processando...' : captureLabel}
-          </button>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Tentar novamente
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
-          >
-            {uploadLabel}
-          </button>
-        </div>
       </div>
+
+      {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
+
+      {cameraState === 'ready' ? (
+        <div className="space-y-1 text-sm text-brand-ink/65">
+          <p>{helperText}</p>
+          {cameraDiagnostics ? <p>{cameraDiagnostics}</p> : null}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => void handleCapture()}
+          disabled={cameraState !== 'ready' || isProcessingCapture}
+          className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Camera className="h-4 w-4" />
+          {isProcessingCapture ? 'Processando...' : captureLabel}
+        </button>
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Tentar novamente
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
+        >
+          {uploadLabel}
+        </button>
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
+          >
+            Voltar
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+
+  if (embedded) return content
+
+  return (
+    <Modal title={title} onClose={onClose}>
+      {content}
     </Modal>
   )
 }

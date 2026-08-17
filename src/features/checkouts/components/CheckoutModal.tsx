@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { Modal } from '../../../components/shared/Modal'
 import type { CheckoutPayload, KeyRecord } from '../../../types/domain'
 import { CapturePhotoDialog } from './CapturePhotoDialog'
+import { QrScannerPanel } from './QrScannerPanel'
+
+type Step = 'qr' | 'photo' | 'form'
 
 interface CheckoutModalProps {
   currentUserId: string
@@ -11,26 +14,41 @@ interface CheckoutModalProps {
   onSubmit: (payload: CheckoutPayload) => Promise<void>
 }
 
+const STEP_LABELS: Record<Step, string> = {
+  qr: '1. Leitura do QR code',
+  photo: '2. Foto do instrutor',
+  form: '3. Dados e confirmação',
+}
+
+const STEPS: Step[] = ['qr', 'photo', 'form']
+
 export const CheckoutModal = ({ currentUserId, keyRecord, onClose, onSubmit }: CheckoutModalProps) => {
+  const [step, setStep] = useState<Step>('qr')
+  const [qrError, setQrError] = useState('')
   const [actorName, setActorName] = useState('')
   const [actorEnrollment, setActorEnrollment] = useState('')
   const [expectedReturnAt, setExpectedReturnAt] = useState('')
   const [notes, setNotes] = useState('')
   const [photoDataUrl, setPhotoDataUrl] = useState('')
-  const [showCamera, setShowCamera] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const previewLabel = useMemo(() => expectedReturnAt || 'Sem prazo definido', [expectedReturnAt])
+  const handleQrScan = (scannedId: string) => {
+    if (scannedId !== keyRecord.id) {
+      setQrError(`O QR code lido (${scannedId}) não corresponde à chave selecionada (${keyRecord.id}). Tente novamente.`)
+      return
+    }
+    setQrError('')
+    setStep('photo')
+  }
+
+  const handlePhotoCapture = (photo: string) => {
+    setPhotoDataUrl(photo)
+    setStep('form')
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
-    if (!photoDataUrl) {
-      setError('Capture a foto do instrutor antes de confirmar a retirada.')
-      return
-    }
-
     setError('')
     setIsSubmitting(true)
 
@@ -54,9 +72,51 @@ export const CheckoutModal = ({ currentUserId, keyRecord, onClose, onSubmit }: C
   }
 
   return (
-    <>
-      <Modal title={`Retirada da chave ${keyRecord.label}`} onClose={onClose}>
-        <form className="space-y-5" onSubmit={handleSubmit}>
+    <Modal title={`Retirada da chave ${keyRecord.label}`} onClose={onClose}>
+      <div className="mb-6 flex items-center gap-2 overflow-x-auto">
+        {STEPS.map((s, index) => (
+          <div key={s} className="flex items-center gap-2">
+            {index > 0 ? <span className="text-brand-ink/30">›</span> : null}
+            <span
+              className={`whitespace-nowrap text-sm font-medium ${
+                s === step ? 'text-brand-teal' : STEPS.indexOf(step) > index ? 'text-brand-ink/50 line-through' : 'text-brand-ink/30'
+              }`}
+            >
+              {STEP_LABELS[s]}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {step === 'qr' ? (
+        <div className="space-y-5">
+          <p className="text-sm text-brand-ink/70">
+            Aproxime o QR code fixado na chave <strong>{keyRecord.label}</strong> da câmera para confirmar a identidade física da chave antes de prosseguir.
+          </p>
+          <QrScannerPanel onScan={handleQrScan} externalError={qrError} />
+          <div className="flex flex-wrap gap-3 border-t border-brand-ink/10 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {step === 'photo' ? (
+        <CapturePhotoDialog
+          embedded
+          onClose={onClose}
+          onCapture={handlePhotoCapture}
+          onBack={() => setStep('qr')}
+        />
+      ) : null}
+
+      {step === 'form' ? (
+        <form className="space-y-5" onSubmit={(e) => void handleSubmit(e)}>
           <div className="grid gap-5 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-medium text-brand-ink">Nome do instrutor</span>
@@ -102,30 +162,20 @@ export const CheckoutModal = ({ currentUserId, keyRecord, onClose, onSubmit }: C
 
           <div className="rounded-[1.5rem] border border-brand-ink/10 bg-brand-sand p-4">
             <div className="mb-3 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-brand-ink">Foto obrigatória</p>
-                <p className="text-sm text-brand-ink/65">Prazo: {previewLabel}</p>
-              </div>
+              <p className="text-sm font-medium text-brand-ink">Foto do instrutor</p>
               <button
                 type="button"
-                onClick={() => setShowCamera(true)}
+                onClick={() => setStep('photo')}
                 className="rounded-full border border-brand-ink/10 px-4 py-2 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
               >
-                {photoDataUrl ? 'Refazer foto' : 'Abrir câmera'}
+                Refazer foto
               </button>
             </div>
-
-            {photoDataUrl ? (
-              <img
-                src={photoDataUrl}
-                alt="Prévia do instrutor"
-                className="max-h-72 w-full rounded-[1.25rem] object-cover sm:max-h-80"
-              />
-            ) : (
-              <p className="rounded-[1.25rem] border border-dashed border-brand-ink/15 px-4 py-10 text-center text-sm text-brand-ink/55">
-                Nenhuma foto capturada.
-              </p>
-            )}
+            <img
+              src={photoDataUrl}
+              alt="Prévia do instrutor"
+              className="max-h-72 w-full rounded-[1.25rem] object-cover sm:max-h-80"
+            />
           </div>
 
           {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
@@ -140,6 +190,13 @@ export const CheckoutModal = ({ currentUserId, keyRecord, onClose, onSubmit }: C
             </button>
             <button
               type="button"
+              onClick={() => setStep('photo')}
+              className="rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
               onClick={onClose}
               className="rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
             >
@@ -147,17 +204,7 @@ export const CheckoutModal = ({ currentUserId, keyRecord, onClose, onSubmit }: C
             </button>
           </div>
         </form>
-      </Modal>
-
-      {showCamera ? (
-        <CapturePhotoDialog
-          onClose={() => setShowCamera(false)}
-          onCapture={(photo) => {
-            setPhotoDataUrl(photo)
-            setShowCamera(false)
-          }}
-        />
       ) : null}
-    </>
+    </Modal>
   )
 }
