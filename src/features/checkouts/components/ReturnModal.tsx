@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { Modal } from '../../../components/shared/Modal'
 import type { DashboardKey } from '../../../types/domain'
+import { formatMovementActor } from '../../../utils/checkoutActor'
 import { formatDateTime } from '../../../utils/time'
 
 interface ReturnModalProps {
@@ -34,7 +35,7 @@ export const ReturnModal = ({ item, onClose, onSubmit }: ReturnModalProps) => {
     <Modal title={`Devolução da chave ${item.key.label}`} onClose={onClose}>
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="rounded-[1.5rem] border border-brand-ink/10 bg-brand-sand p-4 text-sm text-brand-ink/75">
-          <p><strong>Instrutor:</strong> {item.activeMovement?.actorName}</p>
+          <p><strong>Responsável:</strong> {formatMovementActor(item.activeMovement?.actorName, item.activeMovement?.actorEnrollment)}</p>
           <p><strong>Matrícula:</strong> {item.activeMovement?.actorEnrollment}</p>
           <p><strong>Retirada:</strong> {formatDateTime(item.activeMovement?.checkoutAt)}</p>
         </div>

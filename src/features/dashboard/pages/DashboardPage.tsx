@@ -1,9 +1,10 @@
-import { AlertTriangle, Building2, KeyRound, TimerReset } from 'lucide-react'
+import { AlertTriangle, Building2, KeyRound, QrCode, TimerReset } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { AppShell } from '../../../components/shared/AppShell'
 import { useAuth } from '../../auth/useAuth'
 import { CheckoutModal } from '../../checkouts/components/CheckoutModal'
+import { QrScannerPanel } from '../../checkouts/components/QrScannerPanel'
 import { ReturnModal } from '../../checkouts/components/ReturnModal'
 import { KeyStatusGrid } from '../components/KeyStatusGrid'
 import { keysService } from '../../../services/keysService'
@@ -24,6 +25,8 @@ export const DashboardPage = () => {
   const [items, setItems] = useState<DashboardKey[]>([])
   const [selectedCheckout, setSelectedCheckout] = useState<DashboardKey | null>(null)
   const [selectedReturn, setSelectedReturn] = useState<DashboardKey | null>(null)
+  const [isQrCheckoutOpen, setIsQrCheckoutOpen] = useState(false)
+  const [dashboardQrError, setDashboardQrError] = useState('')
   const [filter, setFilter] = useState<FilterId>('all')
 
   useEffect(() => {
@@ -66,16 +69,34 @@ export const DashboardPage = () => {
     })
   }
 
+  const handleDashboardScan = (qrCodeId: string) => {
+    const matchedItem = items.find((item) => item.key.qrCodeId.trim().toUpperCase() === qrCodeId.trim().toUpperCase())
+
+    if (!matchedItem) {
+      setDashboardQrError('Nenhuma chave correspondente a este QR code foi encontrada na unidade ativa.')
+      return
+    }
+
+    if (matchedItem.key.statusCurrent !== 'available') {
+      setDashboardQrError(`A chave ${matchedItem.key.label} não está disponível para retirada no momento.`)
+      return
+    }
+
+    setDashboardQrError('')
+    setSelectedCheckout(matchedItem)
+    setIsQrCheckoutOpen(false)
+  }
+
   return (
     <AppShell>
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="rounded-[2rem] bg-brand-ink p-8 text-white shadow-panel">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-2xl space-y-4">
+        <div className="rounded-[2rem] bg-brand-ink p-6 text-white shadow-panel">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-2xl space-y-3">
               <p className="text-sm uppercase tracking-[0.35em] text-white/60">Recepção {user?.tenantId}</p>
-              <h2 className="text-4xl font-semibold">Visão operacional em tempo real das chaves da unidade.</h2>
+              <h2 className="text-3xl font-semibold">Leitor de QR code da chave</h2>
               <p className="text-white/70">
-                Check-out com foto, registro por matrícula e trilha pronta para QR Code e regras multi-tenant no Firebase.
+                Inicie a retirada lendo o QR code no painel. Em seguida o fluxo continua com foto obrigatória e digitação da matrícula.
               </p>
             </div>
 
@@ -84,6 +105,14 @@ export const DashboardPage = () => {
               <p className="mt-2 text-2xl font-semibold">{user?.tenantId}</p>
               <p className="mt-2 text-sm text-white/65">Perfil {user?.role === 'admin' ? 'Administrador' : 'Recepção'}</p>
             </div>
+          </div>
+
+          <div className="rounded-[1.75rem] bg-white p-5 text-brand-ink">
+            <QrScannerPanel
+              onScan={handleDashboardScan}
+              externalError={dashboardQrError}
+              viewportClassName="h-28 sm:h-36 md:h-44"
+            />
           </div>
         </div>
 
@@ -130,34 +159,56 @@ export const DashboardPage = () => {
         </div>
       </section>
 
-      <section className="mt-8 flex flex-wrap gap-3">
-        {filters.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setFilter(item.id)}
-            className={`rounded-full px-4 py-2 text-sm transition ${
-              filter === item.id ? 'bg-brand-teal text-white' : 'border border-brand-ink/10 bg-white text-brand-ink'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <section className="mt-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-3">
+          {filters.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFilter(item.id)}
+              className={`rounded-full px-4 py-2 text-sm transition ${
+                filter === item.id ? 'bg-brand-teal text-white' : 'border border-brand-ink/10 bg-white text-brand-ink'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCheckout(null)
+            setIsQrCheckoutOpen(true)
+          }}
+          className="inline-flex items-center gap-2 rounded-full bg-brand-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+        >
+          <QrCode className="h-4 w-4" />
+          Registrar retirada por QR code
+        </button>
       </section>
 
       <section className="mt-8">
         <KeyStatusGrid
           items={filteredItems}
-          onCheckout={(item) => setSelectedCheckout(item)}
+          onCheckout={(item) => {
+            setIsQrCheckoutOpen(false)
+            setDashboardQrError('')
+            setSelectedCheckout(item)
+          }}
           onReturn={(item) => setSelectedReturn(item)}
         />
       </section>
 
-      {selectedCheckout && user ? (
+      {(selectedCheckout || isQrCheckoutOpen) && user ? (
         <CheckoutModal
           currentUserId={user.uid}
-          keyRecord={selectedCheckout.key}
-          onClose={() => setSelectedCheckout(null)}
+          availableKeys={items.map((item) => item.key)}
+          keyRecord={selectedCheckout?.key ?? null}
+          onClose={() => {
+            setSelectedCheckout(null)
+            setIsQrCheckoutOpen(false)
+          }}
           onSubmit={handleCheckout}
         />
       ) : null}

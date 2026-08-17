@@ -3,6 +3,7 @@ import { Clock3, QrCode } from 'lucide-react'
 
 import { StatusPill } from '../../../components/shared/StatusPill'
 import type { DashboardKey } from '../../../types/domain'
+import { formatMovementActor } from '../../../utils/checkoutActor'
 import { formatDateTime, formatElapsed, isLate } from '../../../utils/time'
 
 interface KeyCardProps {
@@ -22,7 +23,9 @@ const getInstructorAvatar = (item: DashboardKey) => {
 }
 
 const getInstructorInitials = (name: string) =>
-  name
+  name.startsWith('Matrícula ')
+    ? 'IN'
+    : name
     .trim()
     .split(/\s+/)
     .slice(0, 2)
@@ -69,7 +72,7 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
             <div className="flex min-w-0 flex-col justify-center gap-1.5 px-3 py-2.5 pr-5 text-brand-ink sm:px-4 sm:pr-6">
               <p className="flex items-center gap-2 text-[0.92rem] leading-tight"><QrCode className="h-4 w-4 shrink-0 text-brand-teal" />{item.key.qrCodeId}</p>
               <p className="text-[1.05rem] font-semibold leading-tight text-brand-ink">
-                {item.activeMovement.actorName} • {item.activeMovement.actorEnrollment}
+                {formatMovementActor(item.activeMovement.actorName, item.activeMovement.actorEnrollment)}
               </p>
               <p className="flex items-center gap-2 whitespace-nowrap text-[0.85rem] leading-tight sm:text-[0.88rem]"><Clock3 className="h-4 w-4 shrink-0 text-brand-teal" />Em uso há {formatElapsed(item.activeMovement.checkoutAt)}</p>
               <p className={`whitespace-nowrap pr-2 text-[0.82rem] leading-tight sm:text-[0.85rem] ${late ? 'font-semibold text-brand-red' : 'text-brand-ink'}`}>
