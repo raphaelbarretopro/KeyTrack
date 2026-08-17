@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function tenantMatches(tenantId) {
+      return isSignedIn() && request.auth.token.tenantId == tenantId;
+    }
+
+    function isAdmin() {
+      return request.auth.token.role == 'admin';
+    }
+
+    function canOperateDesk() {
+      return request.auth.token.role in ['admin', 'reception'];
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if tenantMatches(tenantId);
+      allow write: if tenantMatches(tenantId) && isAdmin();
+
+      match /users/{userId} {
+        allow read: if tenantMatches(tenantId);
+        allow create, update, delete: if tenantMatches(tenantId) && isAdmin();
+      }
+
+      match /keys/{keyId} {
+        allow read: if tenantMatches(tenantId);
+        allow create, update, delete: if tenantMatches(tenantId) && isAdmin();
+      }
+
+      match /movements/{movementId} {
+        allow read: if tenantMatches(tenantId);
+        allow create: if tenantMatches(tenantId) && canOperateDesk();
+        allow update: if tenantMatches(tenantId) && canOperateDesk();
+        allow delete: if false;
+      }
+    }
+  }
+}

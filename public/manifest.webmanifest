@@ -1,0 +1,17 @@
+{
+  "name": "KeyTrack SENAI",
+  "short_name": "KeyTrack",
+  "description": "Sistema de gestão de chaves multi-tenant para unidades do SENAI.",
+  "start_url": "/KeyTrack/",
+  "display": "standalone",
+  "background_color": "#f4f4ec",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

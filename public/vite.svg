@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">KeyTrack SENAI</title>
+  <desc id="desc">Logomarca simplificada do aplicativo KeyTrack.</desc>
+  <rect width="256" height="256" rx="48" fill="#0f766e" />
+  <path d="M72 118c0-30.928 25.072-56 56-56s56 25.072 56 56-25.072 56-56 56c-10.324 0-19.996-2.792-28.296-7.664L64 202.04V156h16.2l18.024-18.024A55.714 55.714 0 0 1 72 118Zm56-24a24 24 0 1 0 0 48 24 24 0 0 0 0-48Z" fill="#f4f4ec" />
+  <rect x="150" y="146" width="20" height="56" rx="10" transform="rotate(45 150 146)" fill="#d97706" />
+</svg>
