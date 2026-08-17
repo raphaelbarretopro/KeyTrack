@@ -86,3 +86,13 @@ Cada key possui qrCodeId para preparar o lookup futuro por QR Code. Cada movemen
 3. Adicionar Firebase Emulator Suite e seeds de tenant para testes locais.
 4. Implementar cadastro administrativo de chaves e usuários.
 5. Adicionar leitura de QR Code na busca de chaves.
+
+## Gerar PNGs dos QR codes
+
+Para gerar os arquivos PNG de cada chave cadastrada em modo demo, execute:
+
+```text
+npm run generate:qrcodes
+```
+
+Os arquivos são criados em public/print/qrcodes. O comando também gera um manifest.json com a relação entre chave, qrCodeId e nome do arquivo PNG.

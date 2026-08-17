@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppShell } from '../../../components/shared/AppShell'
 import { useAuth } from '../../auth/useAuth'
 import { CheckoutModal } from '../../checkouts/components/CheckoutModal'
+import { QrScannerPanel } from '../../checkouts/components/QrScannerPanel'
 import { ReturnModal } from '../../checkouts/components/ReturnModal'
 import { KeyStatusGrid } from '../components/KeyStatusGrid'
 import { keysService } from '../../../services/keysService'
@@ -26,6 +27,7 @@ export const DashboardPage = () => {
   const [selectedReturn, setSelectedReturn] = useState<DashboardKey | null>(null)
   const [isQrCheckoutOpen, setIsQrCheckoutOpen] = useState(false)
   const [filter, setFilter] = useState<FilterId>('all')
+  const [dashboardQrError, setDashboardQrError] = useState('')
 
   useEffect(() => {
     if (!user) return undefined
@@ -67,24 +69,38 @@ export const DashboardPage = () => {
     })
   }
 
+  const handleDashboardScan = (qrCodeId: string) => {
+    const matchedItem = items.find((item) => item.key.qrCodeId.trim().toUpperCase() === qrCodeId.trim().toUpperCase())
+
+    if (!matchedItem) {
+      setDashboardQrError('Nenhuma chave correspondente a este QR code foi encontrada na unidade ativa.')
+      return
+    }
+
+    if (matchedItem.key.statusCurrent !== 'available') {
+      setDashboardQrError(`A chave ${matchedItem.key.label} não está disponível para retirada no momento.`)
+      return
+    }
+
+    setDashboardQrError('')
+    setSelectedCheckout(matchedItem)
+    setIsQrCheckoutOpen(false)
+  }
+
   return (
     <AppShell>
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="rounded-[2rem] bg-brand-ink p-8 text-white shadow-panel">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-2xl space-y-4">
-              <p className="text-sm uppercase tracking-[0.35em] text-white/60">Recepção {user?.tenantId}</p>
-              <h2 className="text-4xl font-semibold">Visão operacional em tempo real das chaves da unidade.</h2>
-              <p className="text-white/70">
-                Check-out com leitura por QR code, foto obrigatória e trilha pronta para regras multi-tenant no Firebase.
-              </p>
-            </div>
+        <div className="rounded-[2rem] bg-brand-ink p-6 text-white shadow-panel">
+          <div className="mb-5 space-y-2">
+            <h2 className="text-3xl font-semibold">Leitor de QR code da chave</h2>
+          </div>
 
-            <div className="rounded-[1.75rem] border border-white/10 bg-white/10 px-5 py-4 text-right backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60">Tenant ativo</p>
-              <p className="mt-2 text-2xl font-semibold">{user?.tenantId}</p>
-              <p className="mt-2 text-sm text-white/65">Perfil {user?.role === 'admin' ? 'Administrador' : 'Recepção'}</p>
-            </div>
+          <div className="rounded-[1.75rem] bg-white p-5 text-brand-ink">
+            <QrScannerPanel
+              onScan={handleDashboardScan}
+              externalError={dashboardQrError}
+              viewportClassName="h-28 sm:h-36 md:h-40"
+            />
           </div>
         </div>
 
@@ -165,6 +181,7 @@ export const DashboardPage = () => {
           items={filteredItems}
           onCheckout={(item) => {
             setIsQrCheckoutOpen(false)
+            setDashboardQrError('')
             setSelectedCheckout(item)
           }}
           onReturn={(item) => setSelectedReturn(item)}

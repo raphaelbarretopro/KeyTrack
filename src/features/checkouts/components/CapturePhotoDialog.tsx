@@ -5,14 +5,26 @@ import { Modal } from '../../../components/shared/Modal'
 
 interface CapturePhotoDialogProps {
   onClose: () => void
-  onCapture: (photoDataUrl: string) => void
+  onCapture: (photoDataUrl: string) => void | Promise<void>
+  title?: string
+  helperText?: string
+  captureLabel?: string
+  uploadLabel?: string
 }
 
-export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogProps) => {
+export const CapturePhotoDialog = ({
+  onClose,
+  onCapture,
+  title = 'Capturar foto do instrutor',
+  helperText = 'Pré-visualização ativa. Posicione o instrutor no quadro antes de capturar.',
+  captureLabel = 'Capturar foto',
+  uploadLabel = 'Enviar foto do dispositivo',
+}: CapturePhotoDialogProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [error, setError] = useState('')
+  const [isProcessingCapture, setIsProcessingCapture] = useState(false)
   const [cameraState, setCameraState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [cameraSessionKey, setCameraSessionKey] = useState(0)
   const [cameraDiagnostics, setCameraDiagnostics] = useState('')
@@ -158,7 +170,7 @@ export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogPro
     }
   }, [cameraSessionKey])
 
-  const handleCapture = () => {
+  const handleCapture = async () => {
     if (cameraState !== 'ready') {
       setError('A câmera ainda não está pronta. Aguarde a pré-visualização carregar.')
       return
@@ -197,7 +209,16 @@ export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogPro
       return
     }
 
-    onCapture(screenshot)
+    setError('')
+    setIsProcessingCapture(true)
+
+    try {
+      await onCapture(screenshot)
+    } catch (captureError) {
+      setError(captureError instanceof Error ? captureError.message : 'Falha ao processar a imagem capturada.')
+    } finally {
+      setIsProcessingCapture(false)
+    }
   }
 
   const handleRetry = () => {
@@ -211,22 +232,25 @@ export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogPro
     if (!file) return
 
     try {
+      setError('')
+      setIsProcessingCapture(true)
       const imageDataUrl = await readFileAsDataUrl(file)
 
       if (!imageDataUrl) {
         throw new Error('Não foi possível converter a imagem selecionada.')
       }
 
-      onCapture(imageDataUrl)
+      await onCapture(imageDataUrl)
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Falha ao carregar a imagem do dispositivo.')
     } finally {
+      setIsProcessingCapture(false)
       event.target.value = ''
     }
   }
 
   return (
-    <Modal title="Capturar foto do instrutor" onClose={onClose}>
+    <Modal title={title} onClose={onClose}>
       <div className="space-y-5">
         <input
           ref={fileInputRef}
@@ -260,7 +284,7 @@ export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogPro
 
         {cameraState === 'ready' ? (
           <div className="space-y-1 text-sm text-brand-ink/65">
-            <p>Pré-visualização ativa. Posicione o instrutor no quadro antes de capturar.</p>
+            <p>{helperText}</p>
             {cameraDiagnostics ? <p>{cameraDiagnostics}</p> : null}
           </div>
         ) : null}
@@ -268,12 +292,12 @@ export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogPro
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={handleCapture}
-            disabled={cameraState !== 'ready'}
+            onClick={() => void handleCapture()}
+            disabled={cameraState !== 'ready' || isProcessingCapture}
             className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Camera className="h-4 w-4" />
-            Capturar foto
+            {isProcessingCapture ? 'Processando...' : captureLabel}
           </button>
           <button
             type="button"
@@ -288,7 +312,7 @@ export const CapturePhotoDialog = ({ onClose, onCapture }: CapturePhotoDialogPro
             onClick={() => fileInputRef.current?.click()}
             className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
           >
-            Enviar foto do dispositivo
+            {uploadLabel}
           </button>
         </div>
       </div>
