@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['vite.svg'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 4000000, // Aumenta o limite para ~4MB para evitar o erro do PWA
+      },
       manifest: {
         name: 'KeyTrack SENAI',
         short_name: 'KeyTrack',
