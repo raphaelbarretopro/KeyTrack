@@ -1,24 +1,32 @@
 # KeyTrack SENAI
 
-MVP de sistema de gestão de chaves para unidades do SENAI, com front-end em React + Vite + Tailwind + PWA e backend em Firebase.
+Sistema de gestão operacional de chaves para unidades do SENAI. O KeyTrack registra retiradas e devoluções, identifica chaves por QR Code e mantém o inventário em tempo real no Firebase, com isolamento de dados por unidade.
 
-## Stack
+## Funcionalidades
 
-- React 19 + Vite + TypeScript
-- Tailwind CSS
-- Firebase Authentication e Firestore
-- GitHub Pages para hospedagem do front-end
-- Arquitetura multi-tenant por unidade escolar usando tenantId em custom claims
+- Autenticação de usuários com Firebase Authentication.
+- Dashboard em tempo real com totais de chaves disponíveis, ocupadas, atrasadas e inventário.
+- Retirada de chave por leitura de QR Code, identificação do responsável, previsão de devolução e captura de foto.
+- Devolução com leitura obrigatória do QR Code da mesma chave antes da confirmação.
+- Status de chave: disponível, em uso ou em manutenção.
+- Histórico de movimentações com responsável, matrícula, horários e observações.
+- Geração de QR Codes para impressão a partir do mesmo inventário utilizado no Firestore.
+- Arquitetura multi-tenant: cada unidade possui dados segregados pelo seu `tenantId`.
 
-## O que já foi implementado
+## Tecnologias
 
-- Estrutura inicial do app por domínio em src/app, src/features, src/services e src/components
-- Login com fluxo preparado para MFA TOTP
-- Dashboard da recepção com status das chaves, tempo decorrido e alertas de atraso
-- Modais de check-out e check-in com captura de foto por webcam
-- Serviços preparados para Firebase e modo demo local sem credenciais
-- Regras iniciais de Firestore para segregação por tenant
-- Workflow de deploy para GitHub Pages
+- React 19, TypeScript e React Router.
+- Vite para desenvolvimento e build.
+- Tailwind CSS e PostCSS para interface responsiva.
+- Firebase Authentication para identidade e sessão.
+- Cloud Firestore para dados em tempo real, regras de acesso e transações em lote.
+- Firebase Admin SDK para provisionamento de administrador e carga do inventário.
+- PWA com `vite-plugin-pwa`.
+- `jsQR` para leitura de QR Code por câmera.
+- `react-webcam` e Canvas API para captura e compactação de fotos.
+- `date-fns` para datas e tempos em português.
+- Lucide React para ícones.
+- ESLint para qualidade estática e GitHub Pages para hospedagem do front-end.
 
 ## Estrutura principal
 
@@ -38,6 +46,43 @@ src/
   types/
 ```
 
+## Arquitetura de dados
+
+```text
+tenants/{tenantId}
+tenants/{tenantId}/users/{userId}
+tenants/{tenantId}/keys/{keyId}
+tenants/{tenantId}/movements/{movementId}
+```
+
+- `keys`: cadastro da chave, QR Code, status atual e última movimentação.
+- `movements`: retirada, devolução, responsável, matrícula, horários e observações.
+- `users`: perfil operacional vinculado ao tenant.
+- O dashboard assina as coleções de chaves e movimentações com `onSnapshot`; após um F5, a fonte de verdade continua sendo o Firestore.
+
+## Segurança
+
+- As regras do Firestore restringem toda leitura ao `tenantId` presente nas custom claims do usuário autenticado.
+- Os papéis suportados são `admin` e `reception`.
+- Apenas administradores podem criar, editar ou excluir cadastros estruturais de chaves e usuários.
+- Administradores e recepção podem registrar retirada e devolução.
+- A retirada e a atualização de status da chave ocorrem no mesmo batch atômico; as regras validam o vínculo entre a movimentação e a chave.
+- A devolução também é atômica: registra o horário, altera o status para disponível e remove a foto temporária.
+- Movimentações não podem ser excluídas pelo cliente.
+- Credenciais privadas do Firebase Admin devem ficar fora do Git. O arquivo `serviceAccountKey.json` é ignorado pelo repositório.
+
+## LGPD e Privacidade
+
+O sistema aplica uma estratégia de armazenamento efêmero para a foto capturada na retirada:
+
+- A imagem é redimensionada para no máximo 640px e compactada no navegador antes do envio.
+- A foto é armazenada temporariamente como Base64 no documento da movimentação aberta, com limite de 900.000 caracteres definido nas regras do Firestore.
+- A imagem existe apenas enquanto a chave está em uso, para apoiar a conferência operacional.
+- Na devolução, o campo `capturedPhotoBase64` é removido permanentemente no mesmo batch de atualização da movimentação e da chave.
+- O histórico de horários, responsável, matrícula e observações é preservado sem manter a foto.
+
+Esta estratégia reduz retenção de dados pessoais e elimina a dependência do Firebase Storage para fotos. A unidade ainda deve definir base legal, prazo de retenção dos dados textuais, política de acesso e processo de atendimento aos titulares conforme sua governança institucional.
+
 ## Como rodar localmente
 
 1. Copie .env.example para .env.local.
@@ -45,7 +90,7 @@ src/
 3. Instale as dependências com npm install.
 4. Rode npm run dev.
 
-Sem variáveis do Firebase, a aplicação sobe em modo demo com dados mockados para acelerar a implementação visual e de fluxo.
+O projeto usa o Firebase como fonte de verdade. Sem as variáveis necessárias, as operações de inventário não são executadas.
 
 ## Variáveis de ambiente
 
@@ -60,38 +105,45 @@ As variáveis esperadas estão em .env.example:
 - VITE_APP_NAME
 - VITE_GH_PAGES_BASE
 
-## Modelo de dados inicial
+## Configuração do Firebase
+
+Após instalar o Firebase CLI e autenticar:
 
 ```text
-tenants/{tenantId}
-tenants/{tenantId}/users/{userId}
-tenants/{tenantId}/keys/{keyId}
-tenants/{tenantId}/movements/{movementId}
+firebase login
+firebase use keytrack-senai-crti
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Cada key possui qrCodeId para preparar o lookup futuro por QR Code. Cada movement registra a retirada/devolução, a matrícula, o nome e os horários. Durante uma retirada, a foto é comprimida e armazenada temporariamente como Base64 no documento da movimentação; ela é destruída ao registrar a devolução.
+Para os scripts administrativos, gere uma chave privada em Firebase Console > Configurações do projeto > Contas de serviço > Firebase Admin SDK. Salve o JSON como `serviceAccountKey.json` na raiz do projeto ou defina `GOOGLE_APPLICATION_CREDENTIALS` com o caminho do arquivo.
 
-## Regras multi-tenant
+### Carga inicial
 
-- Usuários autenticados só acessam dados do tenant presente em request.auth.token.tenantId.
-- Perfil reception e admin podem registrar check-out e check-in.
-- Apenas admin pode manter cadastro estrutural de chaves e usuários.
-- A foto temporária só pode ser criada durante uma retirada e a devolução remove o campo de Base64 no mesmo batch da atualização de status.
+```text
+npm run seed:admin
+npm run seed:keys
+```
 
-## Próximos passos recomendados
-
-1. Configurar o projeto Firebase real e publicar custom claims de tenantId, role e mfaRequired.
-2. Trocar o fluxo demo de MFA pela validação TOTP definitiva usando enrollment do Firebase Auth.
-3. Adicionar Firebase Emulator Suite e seeds de tenant para testes locais.
-4. Implementar cadastro administrativo de chaves e usuários.
-5. Adicionar leitura de QR Code na busca de chaves.
+`seed:admin` cria ou atualiza o administrador e suas custom claims. `seed:keys` recria o inventário de chaves do tenant `senai-crti`; execute-o somente quando desejar substituir o inventário atual.
 
 ## Gerar PNGs dos QR codes
 
-Para gerar os arquivos PNG de cada chave cadastrada em modo demo, execute:
+Para gerar os arquivos PNG do inventário atual, execute:
 
 ```text
 npm run generate:qrcodes
 ```
 
 Os arquivos são criados em public/print/qrcodes. O comando também gera um manifest.json com a relação entre chave, qrCodeId e nome do arquivo PNG.
+
+## Scripts
+
+| Comando | Finalidade |
+| --- | --- |
+| `npm run dev` | Inicia o ambiente de desenvolvimento. |
+| `npm run build` | Executa a checagem TypeScript e gera a versão de produção. |
+| `npm run lint` | Executa as regras de lint. |
+| `npm run preview` | Serve localmente o build de produção. |
+| `npm run seed:admin` | Cria ou atualiza o administrador inicial via Firebase Admin SDK. |
+| `npm run seed:keys` | Substitui o inventário de chaves do tenant `senai-crti`. |
+| `npm run generate:qrcodes` | Gera os PNGs e o manifesto dos QR Codes atuais. |
