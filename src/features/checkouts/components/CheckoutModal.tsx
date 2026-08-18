@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, QrCode, ScanFace } from 'lucide-react'
+import { Clock3, QrCode, ScanFace } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Modal } from '../../../components/shared/Modal'

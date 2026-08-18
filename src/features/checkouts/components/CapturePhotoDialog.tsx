@@ -19,7 +19,7 @@ export const CapturePhotoDialog = ({
   onCapture,
   tenantId,
   title = 'Identificação Biométrica',
-  helperText = 'Aguarde o carregamento das redes neurais.',
+  //helperText = 'Aguarde o carregamento das redes neurais.',
 }: CapturePhotoDialogProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
