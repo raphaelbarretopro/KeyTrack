@@ -23,7 +23,7 @@ export const LoginPage = () => {
           </div>
 
           <div className="max-w-xl space-y-6">
-            <p className="text-sm uppercase tracking-[0.35em] text-white/70">Recepção e auditoria</p>
+            <p className="text-sm uppercase tracking-[0.35em] text-white/70">SETEP CRTI</p>
             <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
               Controle operacional de chaves com histórico, foto e segregação por unidade.
             </h1>

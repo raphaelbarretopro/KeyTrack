@@ -1,4 +1,4 @@
-import { AlertTriangle, Building2, KeyRound, QrCode, TimerReset } from 'lucide-react'
+import { AlertTriangle, Building2, KeyRound, TimerReset } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { AppShell } from '../../../components/shared/AppShell'
@@ -10,6 +10,7 @@ import { KeyStatusGrid } from '../components/KeyStatusGrid'
 import { keysService } from '../../../services/keysService'
 import { movementsService } from '../../../services/movementsService'
 import type { CheckoutPayload, DashboardKey } from '../../../types/domain'
+import { isLate } from '../../../utils/time'
 
 const filters = [
   { id: 'all', label: 'Todas' },
@@ -19,6 +20,20 @@ const filters = [
 ] as const
 
 type FilterId = (typeof filters)[number]['id']
+
+const normalizeQrCode = (value: string) => value.trim().toUpperCase()
+
+const getOperationalPriority = (item: DashboardKey) => {
+  if (item.key.statusCurrent === 'occupied' && isLate(item.activeMovement?.expectedReturnAt)) return 0
+
+  const statusPriority = {
+    occupied: 1,
+    available: 2,
+    maintenance: 3,
+  } as const
+
+  return statusPriority[item.key.statusCurrent]
+}
 
 export const DashboardPage = () => {
   const { user } = useAuth()
@@ -36,8 +51,16 @@ export const DashboardPage = () => {
   }, [user])
 
   const filteredItems = useMemo(() => {
-    if (filter === 'all') return items
-    return items.filter((item) => item.key.statusCurrent === filter)
+    const matchingItems = filter === 'all'
+      ? items
+      : items.filter((item) => item.key.statusCurrent === filter)
+
+    return [...matchingItems].sort((firstItem, secondItem) => {
+      const priorityDifference = getOperationalPriority(firstItem) - getOperationalPriority(secondItem)
+      if (priorityDifference !== 0) return priorityDifference
+
+      return firstItem.key.label.localeCompare(secondItem.key.label, 'pt-BR')
+    })
   }, [filter, items])
 
   const stats = useMemo(() => {
@@ -55,6 +78,8 @@ export const DashboardPage = () => {
     }
   }, [items])
 
+  const checkoutPercentage = stats.total ? Math.round((stats.occupied / stats.total) * 100) : 0
+
   const handleCheckout = async (payload: CheckoutPayload) => {
     if (!user) return
     await movementsService.createCheckout(user.tenantId, payload)
@@ -70,7 +95,8 @@ export const DashboardPage = () => {
   }
 
   const handleDashboardScan = (qrCodeId: string) => {
-    const matchedItem = items.find((item) => item.key.qrCodeId.trim().toUpperCase() === qrCodeId.trim().toUpperCase())
+    const normalizedScannedQrCode = normalizeQrCode(qrCodeId)
+    const matchedItem = items.find((item) => normalizeQrCode(item.key.qrCodeId) === normalizedScannedQrCode)
 
     if (!matchedItem) {
       setDashboardQrError('Nenhuma chave correspondente a este QR code foi encontrada na unidade ativa.')
@@ -90,69 +116,77 @@ export const DashboardPage = () => {
   return (
     <AppShell>
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="rounded-[2rem] bg-brand-ink p-6 text-white shadow-panel">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-2xl space-y-3">
-              <p className="text-sm uppercase tracking-[0.35em] text-white/60">Recepção {user?.tenantId}</p>
-              <h2 className="text-3xl font-semibold">Leitor de QR code da chave</h2>
-              <p className="text-white/70">
-                Inicie a retirada lendo o QR code no painel. Em seguida o fluxo continua com foto obrigatória e digitação da matrícula.
-              </p>
-            </div>
-
-            <div className="rounded-[1.75rem] border border-white/10 bg-white/10 px-5 py-4 text-right backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60">Tenant ativo</p>
-              <p className="mt-2 text-2xl font-semibold">{user?.tenantId}</p>
-              <p className="mt-2 text-sm text-white/65">Perfil {user?.role === 'admin' ? 'Administrador' : 'Recepção'}</p>
+        <div className="rounded-xl border border-brand-ink/10 bg-white p-4 shadow-panel">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-brand-ink">Leitor de QR-code</h2>
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] bg-white p-5 text-brand-ink">
+          <div className="flex flex-col gap-5 text-brand-ink sm:flex-row sm:items-center">
             <QrScannerPanel
               onScan={handleDashboardScan}
               externalError={dashboardQrError}
-              viewportClassName="h-28 sm:h-36 md:h-44"
+              viewportClassName="h-full"
+              frameClassName="h-40 w-40 shrink-0"
             />
+            <div className="min-w-0 flex-1 rounded-lg border border-brand-ink/10 bg-brand-sand p-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-sm font-medium text-brand-ink">Chaves retiradas</p>
+                <p className="text-2xl font-semibold text-brand-teal">{checkoutPercentage}%</p>
+              </div>
+              <div
+                aria-label={`${checkoutPercentage}% das chaves estão retiradas`}
+                aria-valuemax={100}
+                aria-valuemin={0}
+                aria-valuenow={checkoutPercentage}
+                className="mt-4 h-3 overflow-hidden rounded-full bg-brand-ink/10"
+                role="progressbar"
+              >
+                <div className="h-full rounded-full bg-brand-amber transition-[width]" style={{ width: `${checkoutPercentage}%` }} />
+              </div>
+              <p className="mt-3 text-sm text-brand-ink/65">{stats.occupied} de {stats.total} chaves estão em uso.</p>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-white p-4 shadow-panel">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700"><KeyRound className="h-5 w-5" /></div>
-              <div>
-                <p className="text-sm text-brand-ink/65">Chaves disponíveis</p>
-                <p className="text-3xl font-semibold text-brand-ink">{stats.available}</p>
+              <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700"><KeyRound className="h-4 w-4" /></div>
+              <div className="min-w-0">
+                <p className="text-xs text-brand-ink/65">Chaves disponíveis</p>
+                <p className="text-2xl font-semibold text-brand-ink">{stats.available}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+          <div className="rounded-xl bg-white p-4 shadow-panel">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-amber-100 p-3 text-amber-700"><Building2 className="h-5 w-5" /></div>
-              <div>
-                <p className="text-sm text-brand-ink/65">Chaves ocupadas</p>
-                <p className="text-3xl font-semibold text-brand-ink">{stats.occupied}</p>
+              <div className="rounded-lg bg-amber-100 p-2 text-amber-700"><Building2 className="h-4 w-4" /></div>
+              <div className="min-w-0">
+                <p className="text-xs text-brand-ink/65">Chaves ocupadas</p>
+                <p className="text-2xl font-semibold text-brand-ink">{stats.occupied}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+          <div className="rounded-xl bg-white p-4 shadow-panel">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-rose-100 p-3 text-rose-700"><AlertTriangle className="h-5 w-5" /></div>
-              <div>
-                <p className="text-sm text-brand-ink/65">Atrasos</p>
-                <p className="text-3xl font-semibold text-brand-ink">{stats.delayed}</p>
+              <div className="rounded-lg bg-rose-100 p-2 text-rose-700"><AlertTriangle className="h-4 w-4" /></div>
+              <div className="min-w-0">
+                <p className="text-xs text-brand-ink/65">Atrasos</p>
+                <p className="text-2xl font-semibold text-brand-ink">{stats.delayed}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+          <div className="rounded-xl bg-white p-4 shadow-panel">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-sky-100 p-3 text-sky-700"><TimerReset className="h-5 w-5" /></div>
-              <div>
-                <p className="text-sm text-brand-ink/65">Inventário total</p>
-                <p className="text-3xl font-semibold text-brand-ink">{stats.total}</p>
+              <div className="rounded-lg bg-sky-100 p-2 text-sky-700"><TimerReset className="h-4 w-4" /></div>
+              <div className="min-w-0">
+                <p className="text-xs text-brand-ink/65">Inventário total</p>
+                <p className="text-2xl font-semibold text-brand-ink">{stats.total}</p>
               </div>
             </div>
           </div>
@@ -173,19 +207,7 @@ export const DashboardPage = () => {
               {item.label}
             </button>
           ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedCheckout(null)
-            setIsQrCheckoutOpen(true)
-          }}
-          className="inline-flex items-center gap-2 rounded-full bg-brand-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-        >
-          <QrCode className="h-4 w-4" />
-          Registrar retirada por QR code
-        </button>
+        </div>        
       </section>
 
       <section className="mt-8">

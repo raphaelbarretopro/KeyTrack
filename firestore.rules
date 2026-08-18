@@ -17,9 +17,39 @@ service cloud.firestore {
       return request.auth.token.role in ['admin', 'reception'];
     }
 
+    function keyAfter(tenantId, keyId) {
+      return getAfter(/databases/$(database)/documents/tenants/$(tenantId)/keys/$(keyId));
+    }
+
+    function movementAfter(tenantId, movementId) {
+      return getAfter(/databases/$(database)/documents/tenants/$(tenantId)/movements/$(movementId));
+    }
+
+    function isValidCheckout(tenantId, keyId) {
+      let movement = movementAfter(tenantId, request.resource.data.lastMovementId);
+      return request.resource.data.statusCurrent == 'occupied'
+        && movement.data.action == 'checkout'
+        && movement.data.keyId == keyId
+        && !('returnedAt' in movement.data);
+    }
+
+    function isValidReturn(tenantId, keyId) {
+      let movement = movementAfter(tenantId, request.resource.data.lastMovementId);
+      return request.resource.data.statusCurrent == 'available'
+        && movement.data.action == 'checkout'
+        && movement.data.keyId == keyId
+        && movement.data.returnedAt != null;
+    }
+
+    function isValidCheckoutPhoto() {
+      return request.resource.data.capturedPhotoBase64 is string
+        && request.resource.data.capturedPhotoBase64.size() > 0
+        && request.resource.data.capturedPhotoBase64.size() <= 900000;
+    }
+
     match /tenants/{tenantId} {
       allow read: if tenantMatches(tenantId);
-      allow write: if tenantMatches(tenantId) && isAdmin();
+      allow write: if false;
 
       match /users/{userId} {
         allow read: if tenantMatches(tenantId);
@@ -28,13 +58,40 @@ service cloud.firestore {
 
       match /keys/{keyId} {
         allow read: if tenantMatches(tenantId);
-        allow create, update, delete: if tenantMatches(tenantId) && isAdmin();
+        allow create, delete: if tenantMatches(tenantId) && isAdmin();
+        allow update: if tenantMatches(tenantId) && (
+          isAdmin() || (
+            canOperateDesk()
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['statusCurrent', 'lastMovementId', 'updatedAt'])
+            && (
+              isValidCheckout(tenantId, keyId)
+              || isValidReturn(tenantId, keyId)
+            )
+          )
+        );
       }
 
       match /movements/{movementId} {
         allow read: if tenantMatches(tenantId);
-        allow create: if tenantMatches(tenantId) && canOperateDesk();
-        allow update: if tenantMatches(tenantId) && canOperateDesk();
+        allow create: if tenantMatches(tenantId)
+          && canOperateDesk()
+          && request.resource.data.action == 'checkout'
+          && request.resource.data.actorUserId == request.auth.uid
+          && !('returnedAt' in request.resource.data)
+          && isValidCheckoutPhoto()
+          && keyAfter(tenantId, request.resource.data.keyId).data.statusCurrent == 'occupied'
+          && keyAfter(tenantId, request.resource.data.keyId).data.lastMovementId == movementId;
+        allow update: if tenantMatches(tenantId)
+          && canOperateDesk()
+          && resource.data.action == 'checkout'
+          && !('returnedAt' in resource.data)
+          && request.resource.data.returnedAt != null
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['returnedAt', 'notes', 'capturedPhotoBase64'])
+          && !('capturedPhotoBase64' in request.resource.data)
+          && keyAfter(tenantId, resource.data.keyId).data.statusCurrent == 'available'
+          && keyAfter(tenantId, resource.data.keyId).data.lastMovementId == movementId;
         allow delete: if false;
       }
     }

@@ -72,7 +72,6 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const previewLabel = useMemo(() => expectedReturnAt || 'Sem prazo definido', [expectedReturnAt])
   const modalTitle = resolvedKey ? `Retirada da chave ${resolvedKey.label}` : 'Registrar retirada por QR code'
   const isQrStepComplete = Boolean(resolvedKey)
   const isPhotoStepComplete = Boolean(photoDataUrl)

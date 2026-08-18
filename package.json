@@ -8,12 +8,15 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate:qrcodes": "node scripts/generate-key-qrcodes.mjs"
+    "generate:qrcodes": "node scripts/generate-key-qrcodes.mjs",
+    "seed:admin": "node scripts/seedAdmin.js",
+    "seed:keys": "node scripts/seedKeys.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.2.1",
+    "firebase-admin": "^13.6.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.542.0",
     "react": "^19.2.8",

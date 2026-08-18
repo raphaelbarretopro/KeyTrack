@@ -6,7 +6,7 @@ MVP de sistema de gestão de chaves para unidades do SENAI, com front-end em Rea
 
 - React 19 + Vite + TypeScript
 - Tailwind CSS
-- Firebase Authentication, Firestore e Storage
+- Firebase Authentication e Firestore
 - GitHub Pages para hospedagem do front-end
 - Arquitetura multi-tenant por unidade escolar usando tenantId em custom claims
 
@@ -17,7 +17,7 @@ MVP de sistema de gestão de chaves para unidades do SENAI, com front-end em Rea
 - Dashboard da recepção com status das chaves, tempo decorrido e alertas de atraso
 - Modais de check-out e check-in com captura de foto por webcam
 - Serviços preparados para Firebase e modo demo local sem credenciais
-- Regras iniciais de Firestore e Storage para segregação por tenant
+- Regras iniciais de Firestore para segregação por tenant
 - Workflow de deploy para GitHub Pages
 
 ## Estrutura principal
@@ -54,7 +54,6 @@ As variáveis esperadas estão em .env.example:
 - VITE_FIREBASE_API_KEY
 - VITE_FIREBASE_AUTH_DOMAIN
 - VITE_FIREBASE_PROJECT_ID
-- VITE_FIREBASE_STORAGE_BUCKET
 - VITE_FIREBASE_MESSAGING_SENDER_ID
 - VITE_FIREBASE_APP_ID
 - VITE_FIREBASE_MEASUREMENT_ID
@@ -70,14 +69,14 @@ tenants/{tenantId}/keys/{keyId}
 tenants/{tenantId}/movements/{movementId}
 ```
 
-Cada key possui qrCodeId para preparar o lookup futuro por QR Code. Cada movement registra a retirada/devolução, a matrícula, o nome, horários e o vínculo com a foto salva no Storage.
+Cada key possui qrCodeId para preparar o lookup futuro por QR Code. Cada movement registra a retirada/devolução, a matrícula, o nome e os horários. Durante uma retirada, a foto é comprimida e armazenada temporariamente como Base64 no documento da movimentação; ela é destruída ao registrar a devolução.
 
 ## Regras multi-tenant
 
 - Usuários autenticados só acessam dados do tenant presente em request.auth.token.tenantId.
 - Perfil reception e admin podem registrar check-out e check-in.
 - Apenas admin pode manter cadastro estrutural de chaves e usuários.
-- Arquivos do Storage ficam dentro de tenants/{tenantId}/checkouts/.
+- A foto temporária só pode ser criada durante uma retirada e a devolução remove o campo de Base64 no mesmo batch da atualização de status.
 
 ## Próximos passos recomendados
 

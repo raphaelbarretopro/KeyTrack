@@ -5,8 +5,8 @@ import type { AppUser, AuthResult } from '../types/domain'
 
 const demoUser: AppUser = {
   uid: 'demo-reception',
-  email: 'recepcao@crti.senai.br',
-  name: 'Recepção CRTI',
+  email: 'setep@crti.senai.br',
+  name: 'SETEP CRTI',
   enrollment: 'SENAI-0001',
   tenantId: 'senai-crti',
   role: 'reception',
@@ -56,7 +56,7 @@ export const authService = {
       demoSession = {
         ...demoUser,
         email,
-        name: email.split('@')[0] || demoUser.name,
+        name: demoUser.name,
         mfaVerified: false,
       }
 

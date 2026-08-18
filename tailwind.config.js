@@ -19,7 +19,7 @@ export default {
         panel: '0 18px 50px rgba(23, 38, 31, 0.12)',
       },
       backgroundImage: {
-        grid: 'radial-gradient(circle at 1px 1px, rgba(15,118,110,0.12) 1px, transparent 0)',
+        grid: 'radial-gradient(circle at 1px 1px, rgba(15,118,110,0.06) 1px, transparent 0)',
       },
     },
   },

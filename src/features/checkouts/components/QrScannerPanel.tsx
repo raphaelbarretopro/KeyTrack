@@ -1,16 +1,22 @@
 import jsQR from 'jsqr'
-import { Keyboard, Power, RefreshCw, ScanLine } from 'lucide-react'
+import { Power, RefreshCw, ScanLine } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 interface QrScannerPanelProps {
   onScan: (qrCodeId: string) => void
   externalError?: string
   viewportClassName?: string
+  frameClassName?: string
 }
 
 const normalizeQrCode = (value: string) => value.trim().toUpperCase()
 
-export const QrScannerPanel = ({ onScan, externalError = '', viewportClassName = 'aspect-video max-h-[34vh]' }: QrScannerPanelProps) => {
+export const QrScannerPanel = ({
+  onScan,
+  externalError = '',
+  viewportClassName = 'aspect-video max-h-[34vh]',
+  frameClassName = 'w-full',
+}: QrScannerPanelProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const frameRef = useRef<number | null>(null)
@@ -19,7 +25,6 @@ export const QrScannerPanel = ({ onScan, externalError = '', viewportClassName =
   const [cameraState, setCameraState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [cameraSessionKey, setCameraSessionKey] = useState(0)
   const [cameraDiagnostics, setCameraDiagnostics] = useState('')
-  const [manualQrCode, setManualQrCode] = useState('')
   const [isScannerEnabled, setIsScannerEnabled] = useState(false)
 
   const stopScanner = () => {
@@ -159,7 +164,6 @@ export const QrScannerPanel = ({ onScan, externalError = '', viewportClassName =
   }, [cameraSessionKey, isScannerEnabled, onScan])
 
   const handleEnableScanner = () => {
-    setManualQrCode('')
     setError('')
     setCameraSessionKey((current) => current + 1)
     setIsScannerEnabled(true)
@@ -172,24 +176,11 @@ export const QrScannerPanel = ({ onScan, externalError = '', viewportClassName =
     setCameraDiagnostics('')
   }
 
-  const handleManualSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const normalized = normalizeQrCode(manualQrCode)
-
-    if (!normalized) {
-      setError('Informe o código do QR para localizar a chave.')
-      return
-    }
-
-    handleDisableScanner()
-    onScan(normalized)
-  }
-
   const displayError = error || externalError
 
   return (
     <div className="space-y-5">
-      <div className="relative w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-black">
+      <div className={`relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-black ${frameClassName}`}>
         {isScannerEnabled ? (
           <video
             key={cameraSessionKey}
@@ -261,27 +252,7 @@ export const QrScannerPanel = ({ onScan, externalError = '', viewportClassName =
         </div>
       ) : null}
 
-      <form className="space-y-3 rounded-[1.5rem] border border-brand-ink/10 bg-white p-4" onSubmit={handleManualSubmit}>
-        <div className="flex items-center gap-2 text-sm font-medium text-brand-ink">
-          <Keyboard className="h-4 w-4 text-brand-teal" />
-          Inserir QR code manualmente
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            value={manualQrCode}
-            onChange={(event) => setManualQrCode(event.target.value)}
-            placeholder="Ex.: QR-CRT-203"
-            className="w-full rounded-2xl border border-brand-ink/10 px-4 py-3 outline-none transition focus:border-brand-teal"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700"
-          >
-            <ScanLine className="h-4 w-4" />
-            Usar código
-          </button>
-        </div>
-      </form>
+      
     </div>
   )
 }

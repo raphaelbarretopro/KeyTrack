@@ -8,7 +8,7 @@ export const LoginForm = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [email, setEmail] = useState('recepcao@crti.senai.br')
+  const [email, setEmail] = useState('setep@crti.senai.br')
   const [password, setPassword] = useState('123456')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -45,7 +45,7 @@ export const LoginForm = () => {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="w-full rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 outline-none transition focus:border-brand-teal"
-          placeholder="recepcao@crti.senai.br"
+          placeholder="setep@crti.senai.br"
           required
         />
       </label>

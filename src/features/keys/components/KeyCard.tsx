@@ -12,14 +12,11 @@ interface KeyCardProps {
   onReturn: (item: DashboardKey) => void
 }
 
-const DEMO_INSTRUCTOR_AVATARS: Record<string, string> = {
-  'Carlos Souza': 'https://randomuser.me/api/portraits/men/32.jpg',
-}
-
 const getInstructorAvatar = (item: DashboardKey) => {
-  if (!item.activeMovement) return ''
+  const photoBase64 = item.activeMovement?.capturedPhotoBase64
+  if (!photoBase64) return ''
 
-  return item.activeMovement.capturedPhotoUrl || DEMO_INSTRUCTOR_AVATARS[item.activeMovement.actorName] || ''
+  return `data:image/jpeg;base64,${photoBase64}`
 }
 
 const getInstructorInitials = (name: string) =>
@@ -41,7 +38,7 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
   const shouldRenderImage = Boolean(instructorAvatar) && failedAvatarSrc !== instructorAvatar
 
   return (
-    <article className="rounded-[2rem] border border-brand-ink/10 bg-white p-5 shadow-panel transition hover:-translate-y-1">
+    <article className="rounded-xl border border-brand-ink/10 bg-white p-5 shadow-panel transition hover:-translate-y-1">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tracking-[0.28em] text-brand-ink/45">{item.key.location}</p>
@@ -51,10 +48,10 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
         <StatusPill status={item.key.statusCurrent} />
       </div>
 
-      <div className="overflow-hidden rounded-[1.5rem] bg-brand-sand text-sm text-brand-ink/75">
+      <div className="overflow-hidden rounded-lg bg-brand-sand text-sm text-brand-ink/75">
         {item.activeMovement ? (
           <div className="grid items-stretch gap-0 grid-cols-[7.4rem_1fr]">
-            <div className="self-stretch overflow-hidden border-y border-l border-brand-ink/10 rounded-l-[1.5rem]">
+            <div className="self-stretch overflow-hidden rounded-l-lg border-y border-l border-brand-ink/10">
               {shouldRenderImage ? (
                 <img
                   src={instructorAvatar}
@@ -93,7 +90,7 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
           <button
             type="button"
             onClick={() => onCheckout(item)}
-            className="flex-1 rounded-full bg-brand-teal px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-700"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-brand-teal px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-700"
           >
             Registrar retirada
           </button>
@@ -103,7 +100,7 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
           <button
             type="button"
             onClick={() => onReturn(item)}
-            className="flex-1 rounded-full bg-brand-amber px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-700"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-brand-amber px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-700"
           >
             Registrar devolução
           </button>
@@ -113,7 +110,7 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
           <button
             type="button"
             disabled
-            className="flex-1 cursor-not-allowed rounded-full border border-brand-ink/10 px-4 py-3 text-sm text-brand-ink/45"
+            className="inline-flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-lg border border-brand-ink/10 px-4 py-3 text-sm text-brand-ink/45"
           >
             Indisponível
           </button>

@@ -37,8 +37,7 @@ export interface MovementRecord {
   checkoutAt?: string
   expectedReturnAt?: string
   returnedAt?: string
-  capturedPhotoPath?: string
-  capturedPhotoUrl?: string
+  capturedPhotoBase64?: string
   notes?: string
   createdAt: string
 }
