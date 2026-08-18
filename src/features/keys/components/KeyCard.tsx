@@ -67,12 +67,12 @@ export const KeyCard = ({ item, onCheckout, onReturn }: KeyCardProps) => {
             </div>
 
             <div className="flex min-w-0 flex-col justify-center gap-1.5 px-3 py-2.5 pr-5 text-brand-ink sm:px-4 sm:pr-6">
-              <p className="flex items-center gap-2 text-[0.92rem] leading-tight"><QrCode className="h-4 w-4 shrink-0 text-brand-teal" />{item.key.qrCodeId}</p>
-              <p className="text-[1.05rem] font-semibold leading-tight text-brand-ink">
+              <p className="flex items-center gap-2 text-[0.80rem] leading-tight"><QrCode className="h-4 w-4 shrink-0 text-brand-teal" />{item.key.qrCodeId}</p>
+              <p className="text-[1.0 rem] font-semibold leading-tight text-brand-ink">
                 {formatMovementActor(item.activeMovement.actorName, item.activeMovement.actorEnrollment)}
               </p>
-              <p className="flex items-center gap-2 whitespace-nowrap text-[0.85rem] leading-tight sm:text-[0.88rem]"><Clock3 className="h-4 w-4 shrink-0 text-brand-teal" />Em uso há {formatElapsed(item.activeMovement.checkoutAt)}</p>
-              <p className={`whitespace-nowrap pr-2 text-[0.82rem] leading-tight sm:text-[0.85rem] ${late ? 'font-semibold text-brand-red' : 'text-brand-ink'}`}>
+              <p className="flex items-center gap-2 whitespace-nowrap text-[0.65rem] leading-tight sm:text-[0.65rem]"><Clock3 className="h-4 w-4 shrink-0 text-brand-teal" />Em uso há {formatElapsed(item.activeMovement.checkoutAt)}</p>
+              <p className={`whitespace-nowrap pr-2 text-[0.65rem] leading-tight sm:text-[0.65rem] ${late ? 'font-semibold text-brand-red' : 'text-brand-ink'}`}>
                 Previsão: {formatDateTime(item.activeMovement.expectedReturnAt)}
               </p>
             </div>

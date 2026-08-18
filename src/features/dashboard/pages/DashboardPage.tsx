@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/useAuth'
 import { CheckoutModal } from '../../checkouts/components/CheckoutModal'
 import { QrScannerPanel } from '../../checkouts/components/QrScannerPanel'
 import { ReturnModal } from '../../checkouts/components/ReturnModal'
+import { InstructorsPanel } from '../components/InstructorsPanel'
 import { KeyStatusGrid } from '../components/KeyStatusGrid'
 import { keysService } from '../../../services/keysService'
 import { movementsService } from '../../../services/movementsService'
@@ -20,6 +21,13 @@ const filters = [
 ] as const
 
 type FilterId = (typeof filters)[number]['id']
+
+const mainTabs = [
+  { id: 'keys', label: 'Chaves' },
+  { id: 'instructors', label: 'Instrutores' },
+] as const
+
+type MainTabId = (typeof mainTabs)[number]['id']
 
 const normalizeQrCode = (value: string) => value.trim().toUpperCase()
 
@@ -43,6 +51,7 @@ export const DashboardPage = () => {
   const [isQrCheckoutOpen, setIsQrCheckoutOpen] = useState(false)
   const [dashboardQrError, setDashboardQrError] = useState('')
   const [filter, setFilter] = useState<FilterId>('all')
+  const [activeTab, setActiveTab] = useState<MainTabId>('keys')
 
   useEffect(() => {
     if (!user) return undefined
@@ -193,34 +202,61 @@ export const DashboardPage = () => {
         </div>
       </section>
 
-      <section className="mt-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-3">
-          {filters.map((item) => (
+      <section className="mt-8 border-b border-brand-ink/10">
+        <div className="flex flex-wrap gap-6">
+          {mainTabs.map((tab) => (
             <button
-              key={item.id}
+              key={tab.id}
               type="button"
-              onClick={() => setFilter(item.id)}
-              className={`rounded-full px-4 py-2 text-sm transition ${
-                filter === item.id ? 'bg-brand-teal text-white' : 'border border-brand-ink/10 bg-white text-brand-ink'
+              onClick={() => setActiveTab(tab.id)}
+              className={`border-b-2 px-1 pb-3 text-sm font-medium transition ${
+                activeTab === tab.id
+                  ? 'border-brand-teal text-brand-teal'
+                  : 'border-transparent text-brand-ink/60 hover:text-brand-ink'
               }`}
             >
-              {item.label}
+              {tab.label}
             </button>
           ))}
-        </div>        
+        </div>
       </section>
 
-      <section className="mt-8">
-        <KeyStatusGrid
-          items={filteredItems}
-          onCheckout={(item) => {
-            setIsQrCheckoutOpen(false)
-            setDashboardQrError('')
-            setSelectedCheckout(item)
-          }}
-          onReturn={(item) => setSelectedReturn(item)}
-        />
-      </section>
+      {activeTab === 'keys' ? (
+        <>
+          <section className="mt-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-3">
+              {filters.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setFilter(item.id)}
+                  className={`rounded-full px-4 py-2 text-sm transition ${
+                    filter === item.id ? 'bg-brand-teal text-white' : 'border border-brand-ink/10 bg-white text-brand-ink'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>        
+          </section>
+
+          <section className="mt-8">
+            <KeyStatusGrid
+              items={filteredItems}
+              onCheckout={(item) => {
+                setIsQrCheckoutOpen(false)
+                setDashboardQrError('')
+                setSelectedCheckout(item)
+              }}
+              onReturn={(item) => setSelectedReturn(item)}
+            />
+          </section>
+        </>
+      ) : (
+        <section className="mt-8">
+          <InstructorsPanel />
+        </section>
+      )}
 
       {(selectedCheckout || isQrCheckoutOpen) && user ? (
         <CheckoutModal

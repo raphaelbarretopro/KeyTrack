@@ -13,6 +13,7 @@
     "seed:keys": "node scripts/seedKeys.js"
   },
   "dependencies": {
+    "@vladmandic/face-api": "^1.7.15",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.2.1",

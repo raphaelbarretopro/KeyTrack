@@ -18,6 +18,7 @@ export interface Instructor {
   name: string
   matricula: string
   photoBase64: string
+  faceDescriptor?: number[]
 }
 
 export interface KeyRecord {

@@ -13,11 +13,13 @@ import type { Instructor } from '../types/domain'
 
 type FirestoreInstructorData = Omit<Instructor, 'id'>
 
+// O BUG ESTAVA AQUI! Nós não estávamos lendo o faceDescriptor de volta do banco.
 const toInstructor = (id: string, data: Partial<FirestoreInstructorData>): Instructor => ({
   id,
   name: data.name || '',
   matricula: data.matricula || '',
   photoBase64: data.photoBase64 || '',
+  faceDescriptor: data.faceDescriptor || [], // <--- A PEÇA QUE FALTAVA!
 })
 
 export const instructorsService = {

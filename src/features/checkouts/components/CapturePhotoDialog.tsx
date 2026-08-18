@@ -1,267 +1,166 @@
-import { Camera, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import * as faceapi from '@vladmandic/face-api'
 
 import { Modal } from '../../../components/shared/Modal'
+import { loadFaceModels, recognizeFace } from '../../../services/faceValidationService'
+import type { Instructor } from '../../../types/domain'
 
 interface CapturePhotoDialogProps {
   onClose: () => void
-  onCapture: (photoDataUrl: string) => void | Promise<void>
+  onCapture: (photoDataUrl: string, recognizedInstructor?: Instructor) => void | Promise<void>
+  tenantId?: string
   title?: string
   helperText?: string
-  captureLabel?: string
-  uploadLabel?: string
 }
 
 export const CapturePhotoDialog = ({
   onClose,
   onCapture,
-  title = 'Capturar foto do instrutor',
-  helperText = 'Pré-visualização ativa. Posicione o instrutor no quadro antes de capturar.',
-  captureLabel = 'Capturar foto',
-  uploadLabel = 'Enviar foto do dispositivo',
+  tenantId,
+  title = 'Identificação Biométrica',
+  helperText = 'Aguarde o carregamento das redes neurais.',
 }: CapturePhotoDialogProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  
+  const isScanningRef = useRef(false)
   const [error, setError] = useState('')
-  const [isProcessingCapture, setIsProcessingCapture] = useState(false)
   const [cameraState, setCameraState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [modelsReady, setModelsReady] = useState(false)
   const [cameraSessionKey, setCameraSessionKey] = useState(0)
-  const [cameraDiagnostics, setCameraDiagnostics] = useState('')
 
-  const getMediaErrorMessage = (mediaError: string | DOMException) =>
-    typeof mediaError === 'string' ? mediaError : mediaError.message
+  const isAutoScanEnabled = Boolean(tenantId)
 
-  const isCanvasMostlyBlack = (canvas: HTMLCanvasElement) => {
-    const context = canvas.getContext('2d', { willReadFrequently: true })
-    if (!context) return false
-
-    const sampleSize = 24
-    const sampleCanvas = document.createElement('canvas')
-    sampleCanvas.width = sampleSize
-    sampleCanvas.height = sampleSize
-    const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true })
-
-    if (!sampleContext) return false
-
-    sampleContext.drawImage(canvas, 0, 0, sampleSize, sampleSize)
-    const { data } = sampleContext.getImageData(0, 0, sampleSize, sampleSize)
-
-    let totalLuminance = 0
-    const pixels = data.length / 4
-
-    for (let index = 0; index < data.length; index += 4) {
-      totalLuminance += (data[index] + data[index + 1] + data[index + 2]) / 3
-    }
-
-    const averageLuminance = totalLuminance / pixels
-    return averageLuminance < 12
-  }
-
-  const readFileAsDataUrl = async (file: File) =>
-    await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-      reader.onerror = () => reject(new Error('Não foi possível ler a imagem selecionada.'))
-      reader.readAsDataURL(file)
-    })
+  useEffect(() => {
+    loadFaceModels()
+      .then(() => setModelsReady(true))
+      .catch(() => setError('Erro ao carregar arquivos da Inteligência Artificial.'))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-
     const stopStream = () => {
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = null
-      }
+      if (videoRef.current) videoRef.current.srcObject = null
     }
 
     const startCamera = async () => {
       setCameraState('loading')
       setError('')
-      setCameraDiagnostics('')
       stopStream()
 
       if (!navigator.mediaDevices?.getUserMedia) {
         setCameraState('error')
-        setError('Este navegador não oferece suporte ao acesso à câmera via getUserMedia.')
+        setError('Navegador sem suporte à câmera.')
         return
       }
 
-      const attempts: MediaStreamConstraints[] = [
-        {
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        },
-        {
-          video: true,
-          audio: false,
-        },
-      ]
-
-      let lastError = ''
-
-      for (const constraints of attempts) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia(constraints)
-
-          if (cancelled) {
-            stream.getTracks().forEach((track) => track.stop())
-            return
-          }
-
-          streamRef.current = stream
-
-          const videoTrack = stream.getVideoTracks()[0]
-          const settings = videoTrack?.getSettings()
-          const detailParts = [
-            videoTrack?.label ? `Dispositivo: ${videoTrack.label}` : '',
-            settings?.width && settings?.height ? `Resolução: ${settings.width}x${settings.height}` : '',
-            typeof settings?.frameRate === 'number' ? `FPS: ${Math.round(settings.frameRate)}` : '',
-            videoTrack ? `Track: ${videoTrack.readyState}` : '',
-          ].filter(Boolean)
-
-          setCameraDiagnostics(detailParts.join(' • '))
-
-          if (!videoRef.current) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
+          audio: false 
+        })
+        if (cancelled) return stopStream()
+        
+        streamRef.current = stream
+        if (!videoRef.current) return stopStream()
+        
+        videoRef.current.srcObject = stream
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            await videoRef.current?.play()
+            if (!cancelled) setCameraState('ready')
+          } catch {
             setCameraState('error')
-            setError('Elemento de vídeo não encontrado para reproduzir a câmera.')
-            stopStream()
-            return
+            setError('Falha ao reproduzir o vídeo da câmera.')
           }
-
-          videoRef.current.srcObject = stream
-          videoRef.current.onloadedmetadata = async () => {
-            try {
-              await videoRef.current?.play()
-              if (!cancelled) {
-                setCameraState('ready')
-              }
-            } catch (playError) {
-              setCameraState('error')
-              setError(
-                `A câmera foi autorizada, mas a reprodução do vídeo falhou. ${playError instanceof Error ? `Detalhe: ${playError.message}` : ''}`,
-              )
-            }
-          }
-
-          return
-        } catch (mediaError) {
-          lastError = getMediaErrorMessage(mediaError as string | DOMException)
         }
+      } catch {
+        setCameraState('error')
+        setError('Permissão da câmera negada.')
       }
-
-      setCameraState('error')
-      setError(
-        `Não foi possível acessar a câmera. Verifique a permissão do navegador, recarregue a página para aplicar a permissão e confirme se nenhum outro aplicativo está usando o dispositivo. ${lastError ? `Detalhe: ${lastError}` : ''}`,
-      )
     }
-
     void startCamera()
-
-    return () => {
-      cancelled = true
-      stopStream()
-    }
+    return () => { cancelled = true; stopStream() }
   }, [cameraSessionKey])
 
-  const handleCapture = async () => {
-    if (cameraState !== 'ready') {
-      setError('A câmera ainda não está pronta. Aguarde a pré-visualização carregar.')
-      return
-    }
-
+  const captureFrameBase64 = () => {
     const video = videoRef.current
-
-    if (!video || !video.videoWidth || !video.videoHeight) {
-      setError('A câmera está conectada, mas não entregou frames válidos para captura.')
-      return
-    }
-
+    if (!video || !video.videoWidth || !video.videoHeight) return null
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
-
     const context = canvas.getContext('2d')
-    if (!context) {
-      setError('Não foi possível inicializar a área de captura da imagem.')
-      return
-    }
-
+    if (!context) return null
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    if (isCanvasMostlyBlack(canvas)) {
-      setError(
-        'A câmera está conectada, mas está entregando um quadro preto ou muito escuro. Isso normalmente indica tampa física, bloqueio do driver ou conflito com outro aplicativo. Use o envio de foto do dispositivo para continuar.',
-      )
-      return
-    }
-
-    const screenshot = canvas.toDataURL('image/webp', 0.92)
-
-    if (!screenshot) {
-      setError('Não foi possível capturar a imagem. Verifique a permissão da câmera e tente novamente.')
-      return
-    }
-
-    setError('')
-    setIsProcessingCapture(true)
-
-    try {
-      await onCapture(screenshot)
-    } catch (captureError) {
-      setError(captureError instanceof Error ? captureError.message : 'Falha ao processar a imagem capturada.')
-    } finally {
-      setIsProcessingCapture(false)
-    }
+    return canvas.toDataURL('image/jpeg', 0.95)
   }
 
-  const handleRetry = () => {
-    setError('')
-    setCameraState('loading')
-    setCameraSessionKey((current) => current + 1)
-  }
+  useEffect(() => {
+    if (!modelsReady || cameraState !== 'ready') return
 
-  const handleUploadFallback = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const stopStream = () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
 
-    try {
-      setError('')
-      setIsProcessingCapture(true)
-      const imageDataUrl = await readFileAsDataUrl(file)
+    const scanInterval = window.setInterval(async () => {
+      if (isScanningRef.current || !videoRef.current || !canvasRef.current) return
+      isScanningRef.current = true
 
-      if (!imageDataUrl) {
-        throw new Error('Não foi possível converter a imagem selecionada.')
+      try {
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        
+        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor()
+
+        const displaySize = { width: video.videoWidth, height: video.videoHeight }
+        faceapi.matchDimensions(canvas, displaySize)
+
+        if (detection) {
+          const resizedDetections = faceapi.resizeResults(detection, displaySize)
+          const context = canvas.getContext('2d')
+          context?.clearRect(0, 0, canvas.width, canvas.height)
+          faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
+
+          if (isAutoScanEnabled && tenantId) {
+            const recognizedInstructor = await recognizeFace(detection.descriptor, tenantId)
+            
+            if (recognizedInstructor) {
+              window.clearInterval(scanInterval)
+              
+              // CORREÇÃO: Tira a foto PRIMEIRO
+              const frame = captureFrameBase64()
+              
+              // DEPOIS desliga o vídeo
+              stopStream()
+              
+              if (frame) await onCapture(frame, recognizedInstructor)
+            }
+          }
+        } else {
+          canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        isScanningRef.current = false
       }
+    }, 150)
 
-      await onCapture(imageDataUrl)
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : 'Falha ao carregar a imagem do dispositivo.')
-    } finally {
-      setIsProcessingCapture(false)
-      event.target.value = ''
-    }
-  }
+    return () => window.clearInterval(scanInterval)
+  }, [cameraState, modelsReady, isAutoScanEnabled, onCapture, tenantId])
 
   return (
     <Modal title={title} onClose={onClose}>
       <div className="space-y-5">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          capture="user"
-          onChange={(event) => void handleUploadFallback(event)}
-          className="hidden"
-        />
-
         <div className="relative overflow-hidden rounded-[1.5rem] border border-brand-ink/10 bg-brand-ink">
+          
           <video
             key={cameraSessionKey}
             ref={videoRef}
@@ -271,60 +170,54 @@ export const CapturePhotoDialog = ({
             className="aspect-video max-h-[60vh] w-full bg-black object-cover"
           />
 
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 px-6">
-            <div
-              aria-hidden="true"
-              className="h-52 w-52 rounded-full border-4 border-white/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.45)] sm:h-64 sm:w-64"
-            />
-            <p className="rounded-full bg-black/35 px-4 py-2 text-center text-sm font-medium text-white">
-              Posicione seu rosto no círculo
-            </p>
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 z-10 aspect-video max-h-[60vh] w-full object-cover"
+          />
+
+          <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 px-6">
+            <div className="relative flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72">
+              <div className="absolute inset-0 rounded-[4rem] shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]" />
+            </div>
+
+            {cameraState === 'ready' && modelsReady ? (
+              <p className="animate-pulse rounded-full bg-brand-teal px-5 py-2 text-center text-sm font-semibold text-white shadow-lg">
+                {isAutoScanEnabled ? 'Escaneando biometria...' : 'Posicione-se no centro'}
+              </p>
+            ) : null}
           </div>
 
-          {cameraState !== 'ready' ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/80 px-6 text-center text-sm text-white/80">
-              {cameraState === 'loading'
-                ? 'Conectando à câmera e aguardando a pré-visualização...'
-                : 'Falha ao carregar a câmera. Revise a permissão do navegador e tente novamente.'}
+          {cameraState !== 'ready' || !modelsReady ? (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-brand-ink/80 px-6 text-center text-sm text-white/80">
+              {!modelsReady ? 'Carregando Redes Neurais de Biometria (Aguarde)...' : 'Ligando câmera...'}
             </div>
           ) : null}
         </div>
 
-        {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
+        {error && <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
 
-        {cameraState === 'ready' ? (
-          <div className="space-y-1 text-sm text-brand-ink/65">
-            <p>{helperText}</p>
-            {cameraDiagnostics ? <p>{cameraDiagnostics}</p> : null}
-          </div>
-        ) : null}
+        {cameraState === 'error' && (
+          <button
+            type="button"
+            onClick={() => setCameraSessionKey((c) => c + 1)}
+            className="w-full inline-flex justify-center items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal"
+          >
+            <RefreshCw className="h-4 w-4" /> Tentar ligar câmera
+          </button>
+        )}
 
-        <div className="flex flex-wrap gap-3">
+        {!isAutoScanEnabled && cameraState === 'ready' && modelsReady && (
           <button
             type="button"
-            onClick={() => void handleCapture()}
-            disabled={cameraState !== 'ready' || isProcessingCapture}
-            className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => {
+              const frame = captureFrameBase64()
+              if (frame) void onCapture(frame)
+            }}
+            className="w-full rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700"
           >
-            <Camera className="h-4 w-4" />
-            {isProcessingCapture ? 'Processando...' : captureLabel}
+            Capturar Foto e Extrair Biometria
           </button>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Tentar novamente
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 px-5 py-3 text-sm text-brand-ink transition hover:border-brand-teal hover:text-brand-teal"
-          >
-            {uploadLabel}
-          </button>
-        </div>
+        )}
       </div>
     </Modal>
   )

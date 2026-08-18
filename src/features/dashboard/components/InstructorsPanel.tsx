@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { useAuth } from '../../auth/useAuth'
 import { instructorsService } from '../../../services/instructorsService'
+import { extractDescriptorFromImage } from '../../../services/faceValidationService'
 import type { Instructor } from '../../../types/domain'
 import { CapturePhotoDialog } from '../../checkouts/components/CapturePhotoDialog'
 
@@ -28,7 +29,8 @@ const loadImage = async (photoDataUrl: string) =>
 
 const toInstructorPhotoBase64 = async (photoDataUrl: string) => {
   const image = await loadImage(photoDataUrl)
-  const maxDimension = 640
+  // CORREÇÃO: Resolução máxima aumentada de 640 para 1280 para manter qualidade HD
+  const maxDimension = 1280
   const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
   const canvas = document.createElement('canvas')
   canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
@@ -38,7 +40,8 @@ const toInstructorPhotoBase64 = async (photoDataUrl: string) => {
   if (!context) throw new Error('Não foi possível preparar a foto do instrutor.')
 
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL('image/jpeg', 0.8).replace(/^data:image\/jpeg;base64,/, '')
+  // CORREÇÃO: Qualidade aumentada de 0.8 para 0.95
+  return canvas.toDataURL('image/jpeg', 0.95).replace(/^data:image\/jpeg;base64,/, '')
 }
 
 const toInstructorPhotoSrc = (photoBase64: string) =>
@@ -129,10 +132,19 @@ export const InstructorsPanel = () => {
       setIsSaving(true)
       setError('')
 
+      const descriptor = await extractDescriptorFromImage(toInstructorPhotoSrc(photoBase64));
+
+      if (!descriptor) {
+        setError('A Inteligência Artificial não conseguiu reconhecer os traços faciais na foto. Certifique-se de que o rosto está claro, bem iluminado e sem obstruções, e tire a foto novamente.')
+        setIsSaving(false)
+        return
+      }
+
       const createdInstructor = await instructorsService.addInstructor(tenantId, {
         name: normalizedName,
         matricula: normalizedMatricula,
         photoBase64,
+        faceDescriptor: Array.from(descriptor),
       })
 
       setItems((current) => [...current, createdInstructor].sort((left, right) => left.name.localeCompare(right.name)))
@@ -243,7 +255,7 @@ export const InstructorsPanel = () => {
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-teal px-5 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            {isSaving ? 'Salvando instrutor...' : 'Salvar instrutor'}
+            {isSaving ? 'Salvando instrutor e extraindo biometria...' : 'Salvar instrutor'}
           </button>
         </form>
       </div>
@@ -252,7 +264,7 @@ export const InstructorsPanel = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-brand-ink">Instrutores cadastrados</p>
-            <p className="mt-1 text-sm text-brand-ink/65">Listagem pronta para vincular o reconhecimento facial quando a etapa de IA for conectada.</p>
+           
           </div>
           <span className="rounded-full bg-brand-teal/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-teal">
             {displayedItems.length} registros
@@ -302,7 +314,7 @@ export const InstructorsPanel = () => {
       {showCaptureDialog ? (
         <CapturePhotoDialog
           title="Capturar foto do instrutor"
-          helperText="Centralize o rosto do instrutor no círculo para obter uma imagem consistente."
+          helperText="A foto capturada será usada pela Inteligência Artificial para gerar sua assinatura biométrica matemática."
           onClose={() => setShowCaptureDialog(false)}
           onCapture={handleCapture}
         />
