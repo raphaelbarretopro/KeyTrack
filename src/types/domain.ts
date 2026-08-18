@@ -13,6 +13,13 @@ export interface AppUser {
   mfaVerified: boolean
 }
 
+export interface Instructor {
+  id: string
+  name: string
+  matricula: string
+  photoBase64: string
+}
+
 export interface KeyRecord {
   id: string
   label: string

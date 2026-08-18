@@ -271,6 +271,16 @@ export const CapturePhotoDialog = ({
             className="aspect-video max-h-[60vh] w-full bg-black object-cover"
           />
 
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 px-6">
+            <div
+              aria-hidden="true"
+              className="h-52 w-52 rounded-full border-4 border-white/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.45)] sm:h-64 sm:w-64"
+            />
+            <p className="rounded-full bg-black/35 px-4 py-2 text-center text-sm font-medium text-white">
+              Posicione seu rosto no círculo
+            </p>
+          </div>
+
           {cameraState !== 'ready' ? (
             <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/80 px-6 text-center text-sm text-white/80">
               {cameraState === 'loading'

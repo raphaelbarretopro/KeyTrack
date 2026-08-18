@@ -98,15 +98,6 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
     setShowCamera(true)
   }, [photoDataUrl, resolvedKey, showCamera])
 
-  useEffect(() => {
-    if (!photoDataUrl) {
-      setShowDetailsDialog(false)
-      return
-    }
-
-    setShowDetailsDialog(true)
-  }, [photoDataUrl])
-
   const handleResolveQrCode = (qrCodeId: string) => {
     const matchedKey = availableKeys.find((item) => normalizeQrCode(item.qrCodeId) === normalizeQrCode(qrCodeId))
 
@@ -122,6 +113,7 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
 
     setResolvedKey(matchedKey)
     setPhotoDataUrl('')
+    setShowDetailsDialog(false)
     setExpectedReturnAt(getDefaultExpectedReturnAt())
     setActorEnrollment('')
     setNotes('')
@@ -287,6 +279,7 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
           onCapture={(photo) => {
             setPhotoDataUrl(photo)
             setShowCamera(false)
+            setShowDetailsDialog(true)
           }}
         />
       ) : null}
@@ -322,6 +315,30 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
                 alt="Prévia do instrutor"
                 className="max-h-72 w-full rounded-[1.25rem] object-cover sm:max-h-80"
               />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-brand-ink">Nome</span>
+                <input
+                  value=""
+                  readOnly
+                  disabled
+                  className="w-full rounded-2xl border border-brand-ink/10 bg-slate-50 px-4 py-3 text-brand-ink/55 outline-none"
+                  placeholder="Será preenchido via IA"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-brand-ink">Matrícula</span>
+                <input
+                  value=""
+                  readOnly
+                  disabled
+                  className="w-full rounded-2xl border border-brand-ink/10 bg-slate-50 px-4 py-3 text-brand-ink/55 outline-none"
+                  placeholder="Será preenchida via IA"
+                />
+              </label>
             </div>
 
             <label className="block space-y-2">
