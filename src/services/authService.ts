@@ -5,7 +5,7 @@ import type { AppUser, AuthResult } from '../types/domain'
 
 const demoUser: AppUser = {
   uid: 'demo-reception',
-  email: 'setep@crti.senai.br',
+  email: 'raphael.boliveira@gmail.com',
   name: 'SETEP CRTI',
   enrollment: 'SENAI-0001',
   tenantId: 'senai-crti',
