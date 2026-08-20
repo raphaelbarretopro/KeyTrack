@@ -30,6 +30,43 @@ export const CapturePhotoDialog = ({
   const [modelsReady, setModelsReady] = useState(false)
   const [cameraSessionKey, setCameraSessionKey] = useState(0)
 
+  const getCameraErrorMessage = (cameraError: unknown) => {
+    if (!(cameraError instanceof DOMException)) {
+      return 'Não foi possível acessar a câmera.'
+    }
+
+    if (cameraError.name === 'NotAllowedError') {
+      return 'Permissão da câmera negada.'
+    }
+
+    if (cameraError.name === 'NotFoundError' || cameraError.message.includes('Requested device not found')) {
+      return 'A câmera solicitada não foi encontrada. Tente novamente para usar a câmera padrão do dispositivo.'
+    }
+
+    return `Não foi possível acessar a câmera. ${cameraError.message}`.trim()
+  }
+
+  const requestCameraStream = async () => {
+    const preferredConstraints: MediaStreamConstraints = {
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    }
+
+    try {
+      return await navigator.mediaDevices.getUserMedia(preferredConstraints)
+    } catch (preferredError) {
+      if (!(preferredError instanceof DOMException)) {
+        throw preferredError
+      }
+
+      if (preferredError.name !== 'NotFoundError' && !preferredError.message.includes('Requested device not found')) {
+        throw preferredError
+      }
+
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    }
+  }
+
   const isAutoScanEnabled = Boolean(tenantId)
 
   useEffect(() => {
@@ -58,10 +95,7 @@ export const CapturePhotoDialog = ({
       }
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-          audio: false 
-        })
+        const stream = await requestCameraStream()
         if (cancelled) return stopStream()
         
         streamRef.current = stream
@@ -77,9 +111,9 @@ export const CapturePhotoDialog = ({
             setError('Falha ao reproduzir o vídeo da câmera.')
           }
         }
-      } catch {
+      } catch (cameraError) {
         setCameraState('error')
-        setError('Permissão da câmera negada.')
+        setError(getCameraErrorMessage(cameraError))
       }
     }
     void startCamera()

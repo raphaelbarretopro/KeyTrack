@@ -27,6 +27,47 @@ export const QrScannerPanel = ({
   const [cameraDiagnostics, setCameraDiagnostics] = useState('')
   const [isScannerEnabled, setIsScannerEnabled] = useState(false)
 
+  const getCameraErrorMessage = (mediaError: unknown) => {
+    if (!(mediaError instanceof DOMException)) {
+      return 'Não foi possível acessar a câmera para ler o QR code.'
+    }
+
+    if (mediaError.name === 'NotAllowedError') {
+      return 'Permissão da câmera negada. Verifique a permissão do navegador e recarregue a página.'
+    }
+
+    if (mediaError.name === 'NotFoundError' || mediaError.message.includes('Requested device not found')) {
+      return 'A câmera preferida não foi encontrada. Tente novamente para usar a câmera padrão do dispositivo.'
+    }
+
+    return `Não foi possível acessar a câmera para ler o QR code. ${mediaError.message ? `Detalhe: ${mediaError.message}` : ''}`.trim()
+  }
+
+  const requestCameraStream = async () => {
+    const preferredConstraints: MediaStreamConstraints = {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+      audio: false,
+    }
+
+    try {
+      return await navigator.mediaDevices.getUserMedia(preferredConstraints)
+    } catch (preferredError) {
+      if (!(preferredError instanceof DOMException)) {
+        throw preferredError
+      }
+
+      if (preferredError.name !== 'NotFoundError' && !preferredError.message.includes('Requested device not found')) {
+        throw preferredError
+      }
+
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    }
+  }
+
   const stopScanner = () => {
     if (frameRef.current) {
       cancelAnimationFrame(frameRef.current)
@@ -99,14 +140,7 @@ export const QrScannerPanel = ({
       }
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        })
+        const stream = await requestCameraStream()
 
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
@@ -149,9 +183,7 @@ export const QrScannerPanel = ({
         }
       } catch (mediaError) {
         setCameraState('error')
-        setError(
-          `Não foi possível acessar a câmera para ler o QR code. ${mediaError instanceof Error ? `Detalhe: ${mediaError.message}` : ''}`,
-        )
+        setError(getCameraErrorMessage(mediaError))
       }
     }
 
