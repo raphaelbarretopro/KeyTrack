@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { AppShell } from '../../../components/shared/AppShell'
 import { useAuth } from '../../auth/useAuth'
+import { useActiveUnidade } from '../../units/useActiveUnidade'
 import { CheckoutModal } from '../../checkouts/components/CheckoutModal'
 import { QrScannerPanel } from '../../checkouts/components/QrScannerPanel'
 import { ReturnModal } from '../../checkouts/components/ReturnModal'
@@ -45,6 +46,7 @@ const getOperationalPriority = (item: DashboardKey) => {
 
 export const DashboardPage = () => {
   const { user } = useAuth()
+  const { unidadeId } = useActiveUnidade()
   const [items, setItems] = useState<DashboardKey[]>([])
   const [selectedCheckout, setSelectedCheckout] = useState<DashboardKey | null>(null)
   const [selectedReturn, setSelectedReturn] = useState<DashboardKey | null>(null)
@@ -54,10 +56,10 @@ export const DashboardPage = () => {
   const [activeTab, setActiveTab] = useState<MainTabId>('keys')
 
   useEffect(() => {
-    if (!user) return undefined
+    if (!user || !unidadeId) return undefined
 
-    return keysService.subscribeDashboard(user.tenantId, setItems)
-  }, [user])
+    return keysService.subscribeDashboard(user.tenantId, unidadeId, setItems)
+  }, [user, unidadeId])
 
   const filteredItems = useMemo(() => {
     const matchingItems = filter === 'all'

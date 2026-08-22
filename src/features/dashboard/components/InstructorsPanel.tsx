@@ -2,6 +2,7 @@ import { Camera, Loader2, Trash2, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { useAuth } from '../../auth/useAuth'
+import { useActiveUnidade } from '../../units/useActiveUnidade'
 import { instructorsService } from '../../../services/instructorsService'
 import { extractDescriptorFromImage } from '../../../services/faceValidationService'
 import type { Instructor } from '../../../types/domain'
@@ -50,6 +51,7 @@ const toInstructorPhotoSrc = (photoBase64: string) =>
 export const InstructorsPanel = () => {
   const { user } = useAuth()
   const tenantId = user?.tenantId ?? ''
+  const { unidadeId } = useActiveUnidade()
 
   const [items, setItems] = useState<Instructor[]>([])
   const [name, setName] = useState('')
@@ -63,7 +65,7 @@ export const InstructorsPanel = () => {
   const displayedItems = tenantId ? items : []
 
   useEffect(() => {
-    if (!tenantId) {
+    if (!tenantId || !unidadeId) {
       return
     }
 
@@ -73,7 +75,7 @@ export const InstructorsPanel = () => {
       try {
         setIsLoading(true)
         setError('')
-        const instructors = await instructorsService.getInstructors(tenantId)
+        const instructors = await instructorsService.getInstructors(tenantId, unidadeId)
 
         if (active) {
           setItems(instructors)
@@ -94,7 +96,7 @@ export const InstructorsPanel = () => {
     return () => {
       active = false
     }
-  }, [tenantId])
+  }, [tenantId, unidadeId])
 
   const resetForm = () => {
     setName('')
@@ -108,8 +110,8 @@ export const InstructorsPanel = () => {
     const normalizedName = name.trim()
     const normalizedMatricula = applyMatriculaMask(matricula)
 
-    if (!tenantId) {
-      setError('Usuário sem tenant ativo para cadastrar instrutores.')
+    if (!tenantId || !unidadeId) {
+      setError('Usuário sem unidade ativa para cadastrar instrutores.')
       return
     }
 
@@ -145,6 +147,7 @@ export const InstructorsPanel = () => {
         matricula: normalizedMatricula,
         photoBase64,
         faceDescriptor: Array.from(descriptor),
+        unidadeId,
       })
 
       setItems((current) => [...current, createdInstructor].sort((left, right) => left.name.localeCompare(right.name)))

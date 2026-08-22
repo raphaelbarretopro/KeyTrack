@@ -120,6 +120,7 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
     try {
       await onSubmit({
         keyId: resolvedKey.id,
+        unidadeId: resolvedKey.unidadeId,
         actorName: recognizedInstructor.name || buildCheckoutActorName(recognizedInstructor.matricula),
         actorEnrollment: recognizedInstructor.matricula,
         expectedReturnAt: expectedReturnAt ? new Date(expectedReturnAt).toISOString() : undefined,
@@ -196,10 +197,11 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
       </Modal>
 
       {/* Câmera Invisível/Automática */}
-      {showCamera && user && (
+      {showCamera && user && resolvedKey && (
         <CapturePhotoDialog
           onClose={() => setShowCamera(false)}
           tenantId={user.tenantId}
+          unidadeId={resolvedKey.unidadeId}
           onCapture={(photo, instructor) => {
             // CORREÇÃO AQUI: Em vez de usar o frame tremido da câmera, usa a foto bonita do cadastro!
             const finalPhoto = instructor && instructor.photoBase64 
@@ -216,7 +218,12 @@ export const CheckoutModal = ({ currentUserId, availableKeys, keyRecord = null, 
 
       {/* Passo 3: Confirmação Final com Dados Preenchidos */}
       {showDetailsDialog && resolvedKey && (
-        <Modal title={`Confirmar ${resolvedKey.label}`} onClose={() => setShowDetailsDialog(false)}>
+        <Modal
+          title={`Confirmar ${resolvedKey.label}`}
+          onClose={() => setShowDetailsDialog(false)}
+          overlayClassName="overflow-hidden px-3 py-2 sm:px-4 sm:py-4"
+          panelClassName="max-h-[calc(100dvh-1rem)] overflow-hidden p-4 sm:max-h-[calc(100dvh-3rem)] sm:p-6"
+        >
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block space-y-2">

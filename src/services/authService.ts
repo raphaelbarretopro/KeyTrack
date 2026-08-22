@@ -1,7 +1,9 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 
-import { auth } from '../lib/firebase/client'
-import type { AppUser, AuthResult } from '../types/domain'
+import { env } from '../config/env'
+import { auth, db } from '../lib/firebase/client'
+import type { AppUser, AuthResult, UserRole } from '../types/domain'
 
 const demoUser: AppUser = {
   uid: 'demo-reception',
@@ -16,21 +18,49 @@ const demoUser: AppUser = {
 
 let demoSession = demoUser
 
-const fromClaims = async (): Promise<AppUser | null> => {
+interface FirestoreUserProfile {
+  name?: string
+  enrollment?: string
+  role?: UserRole
+  unidadeId?: string
+  mfaRequired?: boolean
+}
+
+/**
+ * O papel/unidade vivem no documento do usuário (e não em custom claims),
+ * porque o cadastro precisa funcionar direto do navegador, sem Cloud Functions.
+ * Um usuário autenticado sem documento fica sem permissão nenhuma — as regras
+ * do Firestore recusam tudo nesse caso, o que é o comportamento desejado.
+ */
+const loadAppUser = async (): Promise<AppUser | null> => {
   if (!auth?.currentUser) return null
 
-  const tokenResult = await auth.currentUser.getIdTokenResult()
-  const claims = tokenResult.claims as Record<string, unknown>
+  const firebaseUser = auth.currentUser
+  const tenantId = env.tenantId
+
+  let profile: FirestoreUserProfile = {}
+
+  if (db) {
+    try {
+      const snapshot = await getDoc(doc(db, `tenants/${tenantId}/users/${firebaseUser.uid}`))
+      if (snapshot.exists()) {
+        profile = snapshot.data() as FirestoreUserProfile
+      }
+    } catch {
+      // Sem perfil acessível o usuário fica sem permissões; o app trata isso na UI.
+    }
+  }
 
   return {
-    uid: auth.currentUser.uid,
-    email: auth.currentUser.email ?? '',
-    name: (claims.name as string) || auth.currentUser.displayName || auth.currentUser.email || 'Usuário SENAI',
-    enrollment: (claims.enrollment as string) || 'SEM-MATRICULA',
-    tenantId: (claims.tenantId as string) || 'sem-tenant',
-    role: ((claims.role as 'admin' | 'reception') || 'reception'),
-    mfaRequired: !!claims.mfaRequired,
-    mfaVerified: !claims.mfaRequired,
+    uid: firebaseUser.uid,
+    email: firebaseUser.email ?? '',
+    name: profile.name || firebaseUser.displayName || firebaseUser.email || 'Usuário SENAI',
+    enrollment: profile.enrollment || 'SEM-MATRICULA',
+    tenantId,
+    role: profile.role || 'reception',
+    unidadeId: profile.unidadeId || undefined,
+    mfaRequired: !!profile.mfaRequired,
+    mfaVerified: !profile.mfaRequired,
   }
 }
 
@@ -47,7 +77,7 @@ export const authService = {
         return
       }
 
-      callback(await fromClaims())
+      callback(await loadAppUser())
     })
   },
 
@@ -64,7 +94,7 @@ export const authService = {
     }
 
     await signInWithEmailAndPassword(auth, email, password)
-    const user = await fromClaims()
+    const user = await loadAppUser()
 
     if (!user) {
       throw new Error('Não foi possível carregar a sessão autenticada.')
@@ -86,7 +116,7 @@ export const authService = {
       return demoSession
     }
 
-    const user = await fromClaims()
+    const user = await loadAppUser()
     if (!user) {
       throw new Error('Sessão inválida para concluir o MFA.')
     }

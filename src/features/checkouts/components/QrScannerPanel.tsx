@@ -7,6 +7,8 @@ interface QrScannerPanelProps {
   externalError?: string
   viewportClassName?: string
   frameClassName?: string
+  continueScanningAfterSuccess?: boolean
+  autoStart?: boolean
 }
 
 const normalizeQrCode = (value: string) => value.trim().toUpperCase()
@@ -16,16 +18,20 @@ export const QrScannerPanel = ({
   externalError = '',
   viewportClassName = 'aspect-video max-h-[34vh]',
   frameClassName = 'w-full',
+  continueScanningAfterSuccess = false,
+  autoStart = false,
 }: QrScannerPanelProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const frameRef = useRef<number | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const lastScannedCodeRef = useRef('')
+  const lastScanAtRef = useRef(0)
   const [error, setError] = useState('')
   const [cameraState, setCameraState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [cameraSessionKey, setCameraSessionKey] = useState(0)
   const [cameraDiagnostics, setCameraDiagnostics] = useState('')
-  const [isScannerEnabled, setIsScannerEnabled] = useState(false)
+  const [isScannerEnabled, setIsScannerEnabled] = useState(autoStart)
 
   const getCameraErrorMessage = (mediaError: unknown) => {
     if (!(mediaError instanceof DOMException)) {
@@ -116,12 +122,23 @@ export const QrScannerPanel = ({
       const result = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' })
 
       if (result?.data) {
-        stopScanner()
-        setCameraState('idle')
-        setCameraDiagnostics('')
-        setIsScannerEnabled(false)
-        onScan(normalizeQrCode(result.data))
-        return
+        const normalizedCode = normalizeQrCode(result.data)
+        const now = Date.now()
+        const isDuplicateScan = lastScannedCodeRef.current === normalizedCode && now - lastScanAtRef.current < 1500
+
+        if (!isDuplicateScan) {
+          lastScannedCodeRef.current = normalizedCode
+          lastScanAtRef.current = now
+          onScan(normalizedCode)
+        }
+
+        if (!continueScanningAfterSuccess) {
+          stopScanner()
+          setCameraState('idle')
+          setCameraDiagnostics('')
+          setIsScannerEnabled(false)
+          return
+        }
       }
 
       frameRef.current = requestAnimationFrame(scanFrame)
@@ -193,10 +210,21 @@ export const QrScannerPanel = ({
       cancelled = true
       stopScanner()
     }
-  }, [cameraSessionKey, isScannerEnabled, onScan])
+  }, [cameraSessionKey, continueScanningAfterSuccess, isScannerEnabled, onScan])
+
+  useEffect(() => {
+    if (!autoStart) return
+
+    setError('')
+    lastScannedCodeRef.current = ''
+    lastScanAtRef.current = 0
+    setIsScannerEnabled(true)
+  }, [autoStart])
 
   const handleEnableScanner = () => {
     setError('')
+    lastScannedCodeRef.current = ''
+    lastScanAtRef.current = 0
     setCameraSessionKey((current) => current + 1)
     setIsScannerEnabled(true)
   }
@@ -206,6 +234,8 @@ export const QrScannerPanel = ({
     setIsScannerEnabled(false)
     setCameraState('idle')
     setCameraDiagnostics('')
+    lastScannedCodeRef.current = ''
+    lastScanAtRef.current = 0
   }
 
   const displayError = error || externalError

@@ -11,6 +11,7 @@ const getValue = (key: string) => import.meta.env[key]?.toString().trim() ?? ''
 export const env = {
   appName: getValue('VITE_APP_NAME') || 'KeyTrack SENAI',
   ghPagesBase: getValue('VITE_GH_PAGES_BASE') || '/KeyTrack/',
+  tenantId: getValue('VITE_TENANT_ID') || 'senai-crti',
   firebase: {
     apiKey: getValue('VITE_FIREBASE_API_KEY'),
     authDomain: getValue('VITE_FIREBASE_AUTH_DOMAIN'),

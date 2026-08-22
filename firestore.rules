@@ -1,20 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
+
+    // ---------------------------------------------------------------------
+    // Autorização baseada no DOCUMENTO do usuário (não em custom claims).
+    //
+    // O papel vive em tenants/{tenantId}/users/{uid} porque o navegador
+    // precisa conseguir cadastrar usuários sem Cloud Functions (plano Spark).
+    // get()/exists() aqui são leituras privilegiadas (ignoram estas regras),
+    // então não há recursão. Acessos ao MESMO documento contam como um só.
+    // ---------------------------------------------------------------------
+
+    function callerPath(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid);
     }
 
-    function tenantMatches(tenantId) {
-      return isSignedIn() && request.auth.token.tenantId == tenantId;
+    function isMember(tenantId) {
+      return request.auth != null && exists(callerPath(tenantId));
     }
 
-    function isAdmin() {
-      return request.auth.token.role == 'admin';
+    function callerData(tenantId) {
+      return get(callerPath(tenantId)).data;
     }
 
-    function canOperateDesk() {
-      return request.auth.token.role in ['admin', 'reception'];
+    function callerRole(tenantId) {
+      return callerData(tenantId).role;
+    }
+
+    function callerUnidade(tenantId) {
+      return callerData(tenantId).unidadeId;
+    }
+
+    function isSuperAdmin(tenantId) {
+      return isMember(tenantId) && callerRole(tenantId) == 'super_admin';
+    }
+
+    function isAdminRole(tenantId) {
+      return isMember(tenantId) && callerRole(tenantId) == 'admin';
+    }
+
+    function canAccessUnidade(tenantId, unidadeId) {
+      return isSuperAdmin(tenantId)
+        || (isMember(tenantId) && callerUnidade(tenantId) == unidadeId);
+    }
+
+    function canManageUnidade(tenantId, unidadeId) {
+      return isSuperAdmin(tenantId)
+        || (isAdminRole(tenantId) && callerUnidade(tenantId) == unidadeId);
+    }
+
+    function canOperateDeskForUnidade(tenantId, unidadeId) {
+      return isMember(tenantId)
+        && (callerRole(tenantId) == 'admin' || callerRole(tenantId) == 'reception' || callerRole(tenantId) == 'super_admin')
+        && canAccessUnidade(tenantId, unidadeId);
     }
 
     function keyAfter(tenantId, keyId) {
@@ -48,46 +86,88 @@ service cloud.firestore {
     }
 
     match /tenants/{tenantId} {
-      allow read: if tenantMatches(tenantId);
+      allow read: if isMember(tenantId);
       allow write: if false;
 
       match /users/{userId} {
-        allow read: if tenantMatches(tenantId);
-        allow create, update, delete: if tenantMatches(tenantId) && isAdmin();
+        // O próprio documento é sempre legível: é assim que o app descobre o
+        // papel de quem acabou de logar (sem isso a resolução seria circular).
+        allow read: if request.auth != null && (
+          request.auth.uid == userId
+          || isSuperAdmin(tenantId)
+          || (isAdminRole(tenantId) && canAccessUnidade(tenantId, resource.data.unidadeId))
+        );
+
+        // super_admin cria qualquer papel; admin só cria recepção da própria unidade.
+        allow create: if isMember(tenantId)
+          && request.resource.data.uid == userId
+          && (
+            isSuperAdmin(tenantId)
+            || (
+              isAdminRole(tenantId)
+              && request.resource.data.role == 'reception'
+              && request.resource.data.unidadeId == callerUnidade(tenantId)
+            )
+          );
+
+        // Ninguém edita/apaga o próprio documento: impede autopromoção.
+        allow update: if isMember(tenantId)
+          && request.auth.uid != userId
+          && (
+            isSuperAdmin(tenantId)
+            || (
+              isAdminRole(tenantId)
+              && resource.data.role == 'reception'
+              && request.resource.data.role == 'reception'
+              && resource.data.unidadeId == callerUnidade(tenantId)
+              && request.resource.data.unidadeId == callerUnidade(tenantId)
+            )
+          );
+
+        allow delete: if isMember(tenantId)
+          && request.auth.uid != userId
+          && (
+            isSuperAdmin(tenantId)
+            || (
+              isAdminRole(tenantId)
+              && resource.data.role == 'reception'
+              && resource.data.unidadeId == callerUnidade(tenantId)
+            )
+          );
       }
 
       match /instructors/{instructorId} {
-        allow read, write: if request.auth != null;
+        allow read: if canAccessUnidade(tenantId, resource.data.unidadeId);
+        allow create: if canManageUnidade(tenantId, request.resource.data.unidadeId);
+        allow update, delete: if canManageUnidade(tenantId, resource.data.unidadeId);
       }
 
       match /keys/{keyId} {
-        allow read: if tenantMatches(tenantId);
-        allow create, delete: if tenantMatches(tenantId) && isAdmin();
-        allow update: if tenantMatches(tenantId) && (
-          isAdmin() || (
-            canOperateDesk()
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['statusCurrent', 'lastMovementId', 'updatedAt'])
-            && (
-              isValidCheckout(tenantId, keyId)
-              || isValidReturn(tenantId, keyId)
-            )
+        allow read: if canAccessUnidade(tenantId, resource.data.unidadeId);
+        allow create: if canManageUnidade(tenantId, request.resource.data.unidadeId);
+        allow delete: if canManageUnidade(tenantId, resource.data.unidadeId);
+        allow update: if canManageUnidade(tenantId, resource.data.unidadeId) || (
+          canOperateDeskForUnidade(tenantId, resource.data.unidadeId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['statusCurrent', 'lastMovementId', 'updatedAt'])
+          && (
+            isValidCheckout(tenantId, keyId)
+            || isValidReturn(tenantId, keyId)
           )
         );
       }
 
       match /movements/{movementId} {
-        allow read: if tenantMatches(tenantId);
-        allow create: if tenantMatches(tenantId)
-          && canOperateDesk()
+        allow read: if canAccessUnidade(tenantId, resource.data.unidadeId);
+        allow create: if canOperateDeskForUnidade(tenantId, request.resource.data.unidadeId)
           && request.resource.data.action == 'checkout'
           && request.resource.data.actorUserId == request.auth.uid
           && !('returnedAt' in request.resource.data)
           && isValidCheckoutPhoto()
           && keyAfter(tenantId, request.resource.data.keyId).data.statusCurrent == 'occupied'
-          && keyAfter(tenantId, request.resource.data.keyId).data.lastMovementId == movementId;
-        allow update: if tenantMatches(tenantId)
-          && canOperateDesk()
+          && keyAfter(tenantId, request.resource.data.keyId).data.lastMovementId == movementId
+          && request.resource.data.unidadeId == keyAfter(tenantId, request.resource.data.keyId).data.unidadeId;
+        allow update: if canOperateDeskForUnidade(tenantId, resource.data.unidadeId)
           && resource.data.action == 'checkout'
           && !('returnedAt' in resource.data)
           && request.resource.data.returnedAt != null
@@ -97,6 +177,11 @@ service cloud.firestore {
           && keyAfter(tenantId, resource.data.keyId).data.statusCurrent == 'available'
           && keyAfter(tenantId, resource.data.keyId).data.lastMovementId == movementId;
         allow delete: if false;
+      }
+
+      match /unidades/{unidadeId} {
+        allow read: if isMember(tenantId);
+        allow create, update, delete: if isSuperAdmin(tenantId);
       }
     }
   }

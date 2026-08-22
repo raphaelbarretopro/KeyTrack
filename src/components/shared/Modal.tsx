@@ -3,11 +3,13 @@ import type { PropsWithChildren } from 'react'
 interface ModalProps extends PropsWithChildren {
   title: string
   onClose: () => void
+  overlayClassName?: string
+  panelClassName?: string
 }
 
-export const Modal = ({ children, title, onClose }: ModalProps) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
-    <div className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-panel sm:max-h-[calc(100vh-4rem)]">
+export const Modal = ({ children, title, onClose, overlayClassName = '', panelClassName = '' }: ModalProps) => (
+  <div className={`fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8 ${overlayClassName}`.trim()}>
+    <div className={`max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-panel sm:max-h-[calc(100dvh-4rem)] ${panelClassName}`.trim()}>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-brand-teal">KeyTrack</p>

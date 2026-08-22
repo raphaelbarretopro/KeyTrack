@@ -6,6 +6,7 @@ import {
   getDocs,
   orderBy,
   query,
+  where,
 } from 'firebase/firestore'
 
 import { db } from '../lib/firebase/client'
@@ -13,20 +14,24 @@ import type { Instructor } from '../types/domain'
 
 type FirestoreInstructorData = Omit<Instructor, 'id'>
 
-// O BUG ESTAVA AQUI! Nós não estávamos lendo o faceDescriptor de volta do banco.
 const toInstructor = (id: string, data: Partial<FirestoreInstructorData>): Instructor => ({
   id,
   name: data.name || '',
   matricula: data.matricula || '',
   photoBase64: data.photoBase64 || '',
-  faceDescriptor: data.faceDescriptor || [], // <--- A PEÇA QUE FALTAVA!
+  faceDescriptor: data.faceDescriptor || [],
+  unidadeId: data.unidadeId || '',
 })
 
 export const instructorsService = {
-  async getInstructors(tenantId: string) {
+  async getInstructors(tenantId: string, unidadeId: string) {
     if (!db) throw new Error('Firebase não está configurado para carregar os instrutores.')
 
-    const instructorsRef = query(collection(db, `tenants/${tenantId}/instructors`), orderBy('name'))
+    const instructorsRef = query(
+      collection(db, `tenants/${tenantId}/instructors`),
+      where('unidadeId', '==', unidadeId),
+      orderBy('name'),
+    )
     const snapshot = await getDocs(instructorsRef)
 
     return snapshot.docs.map((item) => toInstructor(item.id, item.data() as FirestoreInstructorData))

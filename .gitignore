@@ -6,3 +6,4 @@ dist
 .env
 serviceAccountKey.json
 coverage
+functions/lib

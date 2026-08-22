@@ -1,6 +1,6 @@
 export type KeyStatus = 'available' | 'occupied' | 'maintenance'
 
-export type UserRole = 'admin' | 'reception'
+export type UserRole = 'super_admin' | 'admin' | 'reception'
 
 export interface AppUser {
   uid: string
@@ -9,6 +9,7 @@ export interface AppUser {
   enrollment: string
   tenantId: string
   role: UserRole
+  unidadeId?: string
   mfaRequired: boolean
   mfaVerified: boolean
 }
@@ -19,6 +20,15 @@ export interface Instructor {
   matricula: string
   photoBase64: string
   faceDescriptor?: number[]
+  unidadeId: string
+}
+
+export interface Unit {
+  id: string
+  nome: string
+  descricao: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface KeyRecord {
@@ -30,6 +40,7 @@ export interface KeyRecord {
   description: string
   active: boolean
   statusCurrent: KeyStatus
+  unidadeId: string
   lastMovementId?: string
   createdAt: string
   updatedAt: string
@@ -38,6 +49,7 @@ export interface KeyRecord {
 export interface MovementRecord {
   id: string
   keyId: string
+  unidadeId: string
   action: 'checkout' | 'checkin'
   actorUserId: string
   actorEnrollment: string
@@ -57,6 +69,7 @@ export interface DashboardKey {
 
 export interface CheckoutPayload {
   keyId: string
+  unidadeId: string
   actorName: string
   actorEnrollment: string
   expectedReturnAt?: string

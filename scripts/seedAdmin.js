@@ -52,7 +52,7 @@ try {
 
 await auth.setCustomUserClaims(user.uid, {
   tenantId,
-  role: 'admin',
+  role: 'super_admin',
 })
 
 await firestore.doc(`tenants/${tenantId}/users/${user.uid}`).set(
@@ -61,7 +61,7 @@ await firestore.doc(`tenants/${tenantId}/users/${user.uid}`).set(
     email,
     name: user.displayName || 'Administrador CRTI',
     tenantId,
-    role: 'admin',
+    role: 'super_admin',
     active: true,
     updatedAt: FieldValue.serverTimestamp(),
     createdAt: FieldValue.serverTimestamp(),

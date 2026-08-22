@@ -4,6 +4,7 @@ import {
   deleteField,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   where,
@@ -60,6 +61,7 @@ export const movementsService = {
 
     batch.set(movementRef, {
       keyId: payload.keyId,
+      unidadeId: payload.unidadeId,
       action: 'checkout',
       actorUserId: payload.actorUserId,
       actorEnrollment: payload.actorEnrollment,
@@ -82,6 +84,7 @@ export const movementsService = {
     return {
       id: movementId,
       keyId: payload.keyId,
+      unidadeId: payload.unidadeId,
       action: 'checkout',
       actorUserId: payload.actorUserId,
       actorEnrollment: payload.actorEnrollment,
@@ -134,5 +137,21 @@ export const movementsService = {
       keyId: keyDoc.id,
       key: keyDoc.data(),
     }
+  },
+
+  async queryByDateRange(tenantId: string, unidadeId: string, range: { from: string; to: string }) {
+    if (!db) throw new Error('Firebase não está configurado para consultar os relatórios.')
+
+    const movementsRef = query(
+      collection(db, `tenants/${tenantId}/movements`),
+      where('unidadeId', '==', unidadeId),
+      where('checkoutAt', '>=', range.from),
+      where('checkoutAt', '<=', range.to),
+      orderBy('checkoutAt', 'desc'),
+    )
+
+    const snapshot = await getDocs(movementsRef)
+
+    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MovementRecord)
   },
 }

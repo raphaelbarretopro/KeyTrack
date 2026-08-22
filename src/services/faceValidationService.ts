@@ -31,9 +31,9 @@ export const extractDescriptorFromImage = async (base64Image: string): Promise<F
   }
 }
 
-export const recognizeFace = async (scannedDescriptor: Float32Array, tenantId: string): Promise<Instructor | null> => {
+export const recognizeFace = async (scannedDescriptor: Float32Array, tenantId: string, unidadeId: string): Promise<Instructor | null> => {
   try {
-    const instructors = await instructorsService.getInstructors(tenantId)
+    const instructors = await instructorsService.getInstructors(tenantId, unidadeId)
     if (!instructors || instructors.length === 0) return null
 
     // Filtra instrutores que têm a biometria cadastrada no banco

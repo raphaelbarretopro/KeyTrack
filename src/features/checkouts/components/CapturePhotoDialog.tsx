@@ -10,6 +10,7 @@ interface CapturePhotoDialogProps {
   onClose: () => void
   onCapture: (photoDataUrl: string, recognizedInstructor?: Instructor) => void | Promise<void>
   tenantId?: string
+  unidadeId?: string
   title?: string
   helperText?: string
 }
@@ -18,7 +19,8 @@ export const CapturePhotoDialog = ({
   onClose,
   onCapture,
   tenantId,
-  title = 'Identificação Biométrica', 
+  unidadeId,
+  title = 'Identificação Biométrica',
 }: CapturePhotoDialogProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -67,7 +69,7 @@ export const CapturePhotoDialog = ({
     }
   }
 
-  const isAutoScanEnabled = Boolean(tenantId)
+  const isAutoScanEnabled = Boolean(tenantId && unidadeId)
 
   useEffect(() => {
     loadFaceModels()
@@ -161,8 +163,8 @@ export const CapturePhotoDialog = ({
           context?.clearRect(0, 0, canvas.width, canvas.height)
           faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
 
-          if (isAutoScanEnabled && tenantId) {
-            const recognizedInstructor = await recognizeFace(detection.descriptor, tenantId)
+          if (isAutoScanEnabled && tenantId && unidadeId) {
+            const recognizedInstructor = await recognizeFace(detection.descriptor, tenantId, unidadeId)
             
             if (recognizedInstructor) {
               window.clearInterval(scanInterval)
@@ -187,7 +189,7 @@ export const CapturePhotoDialog = ({
     }, 150)
 
     return () => window.clearInterval(scanInterval)
-  }, [cameraState, modelsReady, isAutoScanEnabled, onCapture, tenantId])
+  }, [cameraState, modelsReady, isAutoScanEnabled, onCapture, tenantId, unidadeId])
 
   return (
     <Modal title={title} onClose={onClose}>
